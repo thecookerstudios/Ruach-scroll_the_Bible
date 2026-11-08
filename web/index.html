@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Ruach: a free Bible app. Scroll Scripture, study Hebrew and Greek, and read devotionals.">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Ruach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: full-bleed snap feed of painted scenes with a reels-style rail; Read tab is a quiet book page; study opens as a sheet. Single dark lamplit world by design. */
+:root{
+  --ink:#0f0d14; --ink-2:#1a1722; --ink-3:#24202e; --paper:#f4ede1; --mist:rgba(244,237,225,.68);
+  --gold:#e9b85c; --gold-soft:rgba(233,184,92,.16); --ember:#f2957a;
+  --glass:rgba(17,15,23,.72); --line:rgba(244,237,225,.13); --ok:#8fd19e; --no:#f0877a;
+  --f-verse:"EB Garamond",Georgia,"Times New Roman",serif;
+  --f-ui:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-ref:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --scale:1;
+  color-scheme:dark;
+}
+html,body{height:100%;background:var(--ink);color:var(--paper)}
+body{font-family:var(--f-ui);overflow:hidden;-webkit-font-smoothing:antialiased}
+button,select,input{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:8px}
+.app{height:100%;display:grid;grid-template-rows:1fr auto;position:relative}
+.stage{position:relative;overflow:hidden;min-height:0}
+
+.top{position:absolute;inset:0 0 auto;z-index:5;display:flex;align-items:center;gap:8px;
+  padding:10px max(14px,env(safe-area-inset-right,0px)) 18px max(14px,env(safe-area-inset-left,0px));
+  background:linear-gradient(rgba(15,13,20,.9),transparent);pointer-events:none}
+.top>*{pointer-events:auto}
+.brand{display:grid;place-items:center;width:34px;height:34px;flex:none}
+.brand svg{width:24px;height:24px}
+.seg{display:flex;background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:3px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.seg button{padding:6px 11px;border-radius:999px;font-size:13px;font-weight:600;color:var(--mist);white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--paper);color:var(--ink)}
+.spacer{flex:1}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:6px 9px;border-radius:999px;background:var(--glass);border:1px solid var(--line);font-size:13px;font-weight:600;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip svg{width:15px;height:15px}
+.ring{width:20px;height:20px}
+.jchip{position:absolute;top:58px;left:max(14px,env(safe-area-inset-left,0px));z-index:5;color:var(--gold)}
+
+.feed{height:100%;overflow-y:scroll;scroll-snap-type:y mandatory;overscroll-behavior:contain;scrollbar-width:none}
+.feed::-webkit-scrollbar{display:none}
+.card{height:100%;scroll-snap-align:start;scroll-snap-stop:always;position:relative;overflow:hidden;isolation:isolate}
+.scene{position:absolute;inset:0;z-index:-2}
+.scene svg{width:100%;height:100%;display:block}
+.shade{position:absolute;inset:0;z-index:-1;background:linear-gradient(to top,rgba(10,8,14,.9) 0%,rgba(10,8,14,.5) 40%,rgba(10,8,14,0) 64%),linear-gradient(to bottom,rgba(10,8,14,.55),transparent 22%)}
+.body{position:absolute;left:0;right:0;bottom:0;padding:0 max(76px,calc(env(safe-area-inset-right,0px) + 70px)) 26px max(20px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:12px}
+.tag{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--gold);display:flex;gap:8px;align-items:center}
+.tag i{width:18px;height:1px;background:var(--gold);display:inline-block}
+.verse{font-family:var(--f-verse);font-weight:400;line-height:1.28;text-wrap:pretty;max-width:30ch;text-shadow:0 1px 18px rgba(0,0,0,.5);margin:0;overflow-wrap:anywhere}
+.verse .red{color:var(--ember)}
+.ref{font-family:var(--f-ref);font-size:13px;color:var(--mist);letter-spacing:.02em}
+.deeper{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:999px;background:var(--paper);color:var(--ink);font-weight:700;font-size:14px}
+.deeper svg{width:16px;height:16px}
+.deeper.study{background:var(--gold)}
+.rail{position:absolute;right:max(10px,env(safe-area-inset-right,0px));bottom:30px;display:flex;flex-direction:column;gap:14px;align-items:center}
+.act{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--mist);width:54px}
+.act .ic{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:transform .15s}
+.act:active .ic{transform:scale(.9)}
+.act svg{width:22px;height:22px}
+.act.on .ic{background:var(--gold);color:var(--ink);border-color:var(--gold)}
+.act.on{color:var(--gold)}
+.burst{position:absolute;pointer-events:none;font-family:var(--f-verse);font-style:italic;font-size:44px;color:var(--gold);left:50%;top:42%;transform:translate(-50%,-50%);animation:burst .9s ease-out forwards;text-shadow:0 0 30px rgba(233,184,92,.6)}
+@keyframes burst{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}25%{opacity:1;transform:translate(-50%,-50%) scale(1.05)}100%{opacity:0;transform:translate(-50%,-90%) scale(1)}}
+
+.center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;text-align:center;padding:80px max(24px,env(safe-area-inset-right,0px)) 40px max(24px,env(safe-area-inset-left,0px))}
+.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold)}
+.orb{width:180px;height:180px;border-radius:50%;position:relative;display:grid;place-items:center}
+.orb::before{content:"";position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(233,184,92,.55),rgba(233,184,92,.08) 62%,transparent 70%);animation:breathe 8s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:scale(.62)}50%{transform:scale(1.08)}}
+.orb span{position:absolute;font-family:var(--f-verse);font-size:24px;line-height:1.2;max-width:12ch;animation:swapA 8s ease-in-out infinite}
+.orb span+span{animation-name:swapB}
+@keyframes swapA{0%,44%{opacity:1}50%,94%{opacity:0}100%{opacity:1}}
+@keyframes swapB{0%,44%{opacity:0}50%,94%{opacity:1}100%{opacity:0}}
+.hint{color:var(--mist);font-size:14px;max-width:32ch;line-height:1.5;margin:0}
+.q{font-family:var(--f-verse);font-size:27px;line-height:1.25;max-width:20ch;text-wrap:balance;margin:0}
+.opts{display:grid;gap:10px;width:min(100%,340px)}
+.opt{padding:14px 16px;border-radius:14px;background:var(--glass);border:1px solid var(--line);font-weight:600;text-align:left;font-size:15px}
+.opt.right{background:rgba(143,209,158,.18);border-color:var(--ok);color:var(--ok)}
+.opt.wrong{background:rgba(240,135,122,.14);border-color:var(--no);color:var(--no)}
+.explain{color:var(--mist);font-size:14px;line-height:1.5;max-width:32ch;min-height:3em;margin:0}
+.fact{font-family:var(--f-verse);font-size:26px;line-height:1.3;max-width:22ch;text-wrap:balance;margin:0}
+.bigbook{font-family:var(--f-verse);font-size:clamp(46px,14vw,72px);line-height:1;margin:0;text-wrap:balance}
+.bigch{font-family:var(--f-ref);font-size:14px;color:var(--gold);letter-spacing:.2em}
+
+.nav{display:flex;justify-content:space-around;background:var(--ink);border-top:1px solid var(--line);padding:6px max(4px,env(safe-area-inset-right,0px)) 6px max(4px,env(safe-area-inset-left,0px))}
+.nav button{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--mist);padding:4px 6px;min-width:56px}
+.nav button svg{width:22px;height:22px}
+.nav button[aria-current="page"]{color:var(--gold)}
+
+.view{position:absolute;inset:0;z-index:6;overflow-y:auto;background:var(--ink);padding:24px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px))}
+.wrap{max-width:660px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.h1{font-family:var(--f-verse);font-size:34px;font-weight:500;margin:0;text-wrap:balance}
+.h2{font-family:var(--f-verse);font-size:24px;font-weight:500;margin:6px 0 0}
+.lede{color:var(--mist);font-size:15px;line-height:1.55;margin:0}
+.jgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.jtile{position:relative;height:178px;border-radius:18px;overflow:hidden;text-align:left;display:flex;flex-direction:column;justify-content:flex-end;padding:14px;isolation:isolate}
+.jtile::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(to top,rgba(10,8,14,.85),rgba(10,8,14,.05) 70%)}
+.jtile b{font-family:var(--f-verse);font-size:23px;font-weight:500}
+.jtile small{font-size:12px;color:var(--mist);line-height:1.4}
+.jtile em{font-style:normal;font-family:var(--f-ref);font-size:11px;color:var(--gold);margin-bottom:4px}
+.list{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.row{display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--line);text-align:left;width:100%}
+.row .sw{width:44px;height:58px;border-radius:10px;overflow:hidden;flex:none;position:relative}
+.row .txt{min-width:0;display:flex;flex-direction:column;gap:6px}
+.row .vt{font-family:var(--f-verse);font-size:17px;line-height:1.35}
+.row .note{font-size:14px;color:var(--mist);line-height:1.5;border-left:2px solid var(--gold);padding-left:10px;white-space:pre-wrap}
+.empty{padding:28px 18px;border:1px dashed var(--line);border-radius:16px;color:var(--mist);line-height:1.55;font-size:15px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{padding:14px;border-radius:14px;background:var(--ink-2);border:1px solid var(--line);min-width:0}
+.stat b{display:block;font-family:var(--f-verse);font-size:30px;font-weight:500;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--mist)}
+.week{display:flex;gap:6px}
+.week div{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;color:var(--mist)}
+.week i{width:100%;max-width:34px;aspect-ratio:1;border-radius:50%;border:1px solid var(--line);display:block}
+.week i.lit{background:radial-gradient(circle,var(--gold),rgba(233,184,92,.35));border-color:var(--gold)}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--gold);border-radius:4px}
+.toggle{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);font-size:15px;width:100%;text-align:left}
+.sw2{width:44px;height:26px;border-radius:999px;background:var(--line);position:relative;flex:none;transition:background .2s}
+.sw2::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--paper);transition:transform .2s}
+[aria-checked="true"] .sw2{background:var(--gold)}[aria-checked="true"] .sw2::after{transform:translateX(18px)}
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--mist);font-weight:600}
+select,input[type=search]{background:var(--ink-2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:15px;width:100%;min-width:0}
+.promise{padding:16px;border-radius:16px;background:var(--gold-soft);border:1px solid rgba(233,184,92,.35);font-size:14px;line-height:1.55}
+.promise b{color:var(--gold)}
+
+/* reader */
+.rbar{display:grid;grid-template-columns:1.6fr .8fr;gap:8px}
+.rbar .full{grid-column:1/-1}
+.chapter{font-family:var(--f-verse);font-size:calc(20px * var(--scale));line-height:1.65;max-width:62ch}
+.chapter h2{font-weight:500;font-size:30px;margin:8px 0 14px;display:flex;align-items:baseline;gap:12px}
+.chapter h2 small{font-family:var(--f-ref);font-size:12px;color:var(--mist)}
+.vs{cursor:pointer;border-radius:4px;transition:background .2s}
+.vs sup{font-family:var(--f-ref);font-size:.55em;color:var(--gold);margin-right:3px}
+.vs.sel{background:var(--gold-soft);box-shadow:0 0 0 3px var(--gold-soft)}
+.vs.saved{text-decoration:underline;text-decoration-color:var(--gold);text-underline-offset:4px}
+.pager{display:flex;justify-content:space-between;gap:10px}
+.ghost{padding:11px 16px;border-radius:999px;border:1px solid var(--line);font-weight:600;font-size:14px}
+.vbar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:6;display:flex;gap:4px;background:var(--paper);color:var(--ink);border-radius:999px;padding:5px;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.vbar button{padding:9px 13px;border-radius:999px;font-weight:700;font-size:13px}
+.vbar button:hover{background:rgba(15,13,20,.08)}
+.hit{padding:12px 0;border-bottom:1px solid var(--line);text-align:left;width:100%;display:flex;flex-direction:column;gap:4px}
+.hit .vt{font-family:var(--f-verse);font-size:17px;line-height:1.4}
+.hit mark{background:var(--gold-soft);color:var(--gold);border-radius:3px}
+
+/* sheet */
+.backdrop{position:fixed;inset:0;background:rgba(5,4,8,.6);z-index:20;opacity:0;transition:opacity .25s}
+.backdrop.show{opacity:1}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;max-height:88%;overflow-y:auto;background:var(--ink-2);border-radius:22px 22px 0 0;border-top:1px solid var(--line);
+  padding:10px max(20px,env(safe-area-inset-right,0px)) calc(28px + env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px));transform:translateY(100%);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+.sheet.show{transform:none}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 14px}
+.sh{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.sh .verse{font-size:22px;max-width:none;text-shadow:none}
+.sec{display:flex;flex-direction:column;gap:8px}
+.sec h3{margin:0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:700}
+.sec p{margin:0;font-size:15.5px;line-height:1.6;max-width:62ch}
+.ctx{font-family:var(--f-verse);font-size:17px;line-height:1.6;color:var(--mist)}
+.ctx b{color:var(--paper);font-weight:400;background:var(--gold-soft);border-radius:3px}
+.ctx sup{font-family:var(--f-ref);font-size:.6em;color:var(--gold);margin-right:2px}
+.word{display:flex;gap:16px;align-items:center;padding:14px;border-radius:14px;background:var(--ink);border:1px solid var(--line)}
+.word .orig{font-family:var(--f-verse);font-size:34px;color:var(--gold);flex:none;min-width:64px;text-align:center}
+.word .wm{min-width:0;display:flex;flex-direction:column;gap:3px}
+.word .tr{font-family:var(--f-ref);font-size:13px}
+.word .wn{font-size:14px;color:var(--mist);line-height:1.5}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{font-family:var(--f-ref);font-size:12px;padding:7px 11px;border-radius:999px;border:1px solid var(--line);color:var(--mist)}
+button.pill:hover,button.pill[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+.cmp{display:flex;flex-direction:column;gap:12px}
+.cmp div{border-left:2px solid var(--gold);padding-left:12px}
+.cmp small{font-family:var(--f-ref);font-size:11px;color:var(--gold);display:block;margin-bottom:3px}
+.cmp p{font-family:var(--f-verse);font-size:17px;line-height:1.5}
+.pray{font-family:var(--f-verse);font-style:italic;font-size:18px;line-height:1.5}
+textarea{width:100%;min-height:96px;resize:vertical;background:var(--ink);color:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px;font:15px/1.5 var(--f-ui)}
+.btn{padding:11px 18px;border-radius:999px;background:var(--gold);color:var(--ink);font-weight:700;font-size:14px;align-self:flex-start}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.toast{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translate(-50%,-10px);z-index:30;background:var(--paper);color:var(--ink);padding:10px 16px;border-radius:999px;font-weight:600;font-size:14px;opacity:0;transition:.25s;pointer-events:none;max-width:calc(100% - 32px);text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.loading{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:6;font-size:13px;font-weight:600;padding:8px 14px;border-radius:999px;background:var(--glass);border:1px solid var(--line);display:flex;gap:8px;align-items:center;white-space:nowrap}
+
+.tw{animation:tw 3.6s ease-in-out infinite}
+@keyframes tw{0%,100%{opacity:.25}50%{opacity:1}}
+.drift{animation:drift 9s ease-in-out infinite alternate}
+@keyframes drift{to{transform:translateX(-30px)}}
+.rays{transform-origin:200px -60px;animation:sway 14s ease-in-out infinite alternate}
+@keyframes sway{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}
+.flick{animation:flick 2.4s ease-in-out infinite}
+@keyframes flick{0%,100%{opacity:.85}45%{opacity:1}60%{opacity:.75}}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.facts div{background:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px;min-width:0;display:flex;flex-direction:column;gap:3px}
+.facts small{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:700}
+.facts span{font-size:13px;line-height:1.35;overflow-wrap:anywhere}
+.kv{font-family:var(--f-verse);font-size:16px!important;line-height:1.5;color:var(--mist)}
+.kv b{display:block;font-family:var(--f-ui);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:4px;font-weight:700}
+.ow{display:flex;flex-wrap:wrap;gap:6px}
+.wd{display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 9px;border-radius:10px;border:1px solid var(--line);background:var(--ink);min-width:0;max-width:100%}
+.wd .o{font-family:var(--f-verse);font-size:21px;color:var(--gold);line-height:1.3}
+.wd .t{font-family:var(--f-ref);font-size:10px;color:var(--mist);direction:ltr}
+.wd .g{font-size:11px;direction:ltr;text-align:center}
+.wd.on{border-color:var(--gold);background:var(--gold-soft)}
+.lex{margin-top:10px;padding:14px;border-radius:14px;background:var(--ink);border:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.lex .lh{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.lex .o{font-family:var(--f-verse);font-size:28px;color:var(--gold)}
+.lex .tr{font-family:var(--f-ref);font-size:12px;color:var(--mist)}
+.lex p{font-size:14px!important;color:var(--mist);line-height:1.55}
+.xrl{display:flex;flex-direction:column}
+.xri{text-align:left;padding:10px 0;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:3px;width:100%}
+.xri .vt{font-family:var(--f-verse);font-size:16px;line-height:1.4}
+.devhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.devbody p{font-family:var(--f-verse);font-size:18px!important;line-height:1.65}
+input[type=date]{background:var(--ink-2);border:1px solid var(--line);border-radius:12px;padding:9px 12px;font-size:15px;width:100%;min-width:0}
+.btn:disabled{opacity:.6}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:370px){.seg button{padding:6px 8px;font-size:12px}.chip{padding:6px 7px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage">
+    <section id="v-feed" style="position:absolute;inset:0">
+      <header class="top">
+        <div class="brand" aria-label="Ruach"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M3 8h10.5a3 3 0 1 0-3-3"/><path d="M3 12.5h15a3 3 0 1 1-3 3" stroke="var(--gold)"/><path d="M3 17h6.5"/></svg></div>
+        <div class="seg" role="group" aria-label="Feed mode"><button id="mFor" aria-pressed="true">For You</button><button id="mThru" aria-pressed="false">Read Through</button></div>
+        <span class="spacer"></span>
+        <span class="chip" title="Day streak"><svg viewBox="0 0 24 24" fill="var(--gold)" aria-hidden="true"><path d="M12 2c2 3.5 6 6 6 11a6 6 0 0 1-12 0c0-2.7 1.4-4.3 2.6-5.6.2 1.7 1 2.9 2.2 3.5C10.3 7.5 11.2 4.7 12 2z"/></svg><span id="streakN">1</span></span>
+        <span class="chip" title="Daily goal"><svg class="ring" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="14" fill="none" stroke="var(--line)" stroke-width="4"/><circle id="ringArc" cx="18" cy="18" r="14" fill="none" stroke="var(--gold)" stroke-width="4" stroke-linecap="round" stroke-dasharray="88" stroke-dashoffset="88" transform="rotate(-90 18 18)"/></svg><span id="goalN">0/10</span></span>
+      </header>
+      <button class="chip jchip" id="jchip" hidden aria-label="Clear journey"></button>
+      <main class="feed" id="feed" aria-label="Scripture feed"></main>
+      <div class="loading" id="loading" hidden></div>
+    </section>
+
+    <section class="view" id="v-read" hidden>
+      <div class="wrap">
+        <div class="rbar">
+          <label class="field">Book<select id="rBook"></select></label>
+          <label class="field">Chapter<select id="rCh"></select></label>
+          <label class="field full">Translation<select id="rTr"></select></label>
+          <label class="field full">Search this translation<input type="search" id="rSearch" placeholder="e.g. peace, shepherd, love one another" enterkeyhint="search"></label>
+        </div>
+        <div id="hits" hidden></div>
+        <article class="chapter" id="chapter"></article>
+        <div class="pager"><button class="ghost" id="prevCh">‹ Previous</button><button class="ghost" id="nextCh">Next ›</button></div>
+      </div>
+      <div class="vbar" id="vbar" hidden><button data-v="save">Save</button><button data-v="study">Go deeper</button><button data-v="copy">Copy</button><button data-v="x" aria-label="Close">✕</button></div>
+    </section>
+
+    <section class="view" id="v-journeys" hidden>
+      <div class="wrap">
+        <div class="devhead"><h1 class="h1">Devotionals</h1><button class="btn" id="devNew" type="button" hidden>Write a devotional</button></div>
+        <div id="devList"></div>
+        <h1 class="h1" style="margin-top:14px">Journeys</h1>
+        <p class="lede">Pick what your heart needs today. Your feed fills with Scripture on that theme, with guided studies mixed in.</p>
+        <div class="jgrid" id="jgrid"></div>
+      </div>
+    </section>
+
+    <section class="view" id="v-saved" hidden>
+      <div class="wrap"><h1 class="h1">Saved verses</h1><div id="savedList"></div></div>
+    </section>
+
+    <section class="view" id="v-me" hidden>
+      <div class="wrap">
+        <h1 class="h1">Your walk</h1>
+        <p class="lede"><b style="color:var(--paper)">Ruach</b> (ROO-akh) is Hebrew for breath, wind, and Spirit. God-breathed. Every word.</p>
+        <div class="promise" style="display:flex;flex-direction:column;gap:8px"><span class="eyebrow">Our mission · 2 Timothy 3:16–17</span><span id="missionV" style="font-family:var(--f-verse);font-size:19px;line-height:1.45"></span><span style="color:var(--mist)">We exist to put all of Scripture in everyone's hands, free, so that every reader is equipped for every good work.</span></div>
+        <div class="stats">
+          <div class="stat"><b id="sToday">0</b><span>verses today</span></div>
+          <div class="stat"><b id="sStreak">1</b><span>day streak</span></div>
+          <div class="stat"><b id="sTotal">0</b><span>all time</span></div>
+        </div>
+        <div class="week" id="week"></div>
+        <div class="sec"><h3 class="eyebrow">Read through the Bible</h3><div class="bar"><i id="thruBar" style="width:0"></i></div><p class="lede" id="thruTxt"></p></div>
+        <h2 class="h2">Share feedback</h2>
+        <div class="sec" style="gap:10px">
+          <p class="lede">Ruach is in early testing and your thoughts shape what comes next. Answer what you like, tap Copy, then text or email it to the person who shared this with you.</p>
+          <label class="field">What did you love?<textarea id="fb1" style="min-height:64px"></textarea></label>
+          <label class="field">What was confusing or broken?<textarea id="fb2" style="min-height:64px"></textarea></label>
+          <label class="field">What would make you open it every day?<textarea id="fb3" style="min-height:64px"></textarea></label>
+          <label class="field">Your phone and browser (e.g. iPhone, Safari)<input type="search" id="fb4" enterkeyhint="done"></label>
+          <button class="btn" id="fbCopy" type="button">Copy my feedback</button>
+        </div>
+        <h2 class="h2">Journal</h2>
+        <div id="journalList"></div>
+        <h2 class="h2">Settings</h2>
+        <label class="field">Translation<select id="sTr"></select></label>
+        <label class="field">Text size<select id="sSize"><option value=".9">Smaller</option><option value="1">Standard</option><option value="1.15">Larger</option><option value="1.3">Largest</option></select></label>
+        <div>
+          <button class="toggle" role="switch" id="tRed" aria-checked="true">Words of Jesus in red (guided studies)<span class="sw2"></span></button>
+          <button class="toggle" role="switch" id="tGoal" aria-checked="false">Bigger daily goal (20 verses)<span class="sw2"></span></button>
+        </div>
+        <div class="promise" style="display:flex;flex-direction:column;gap:10px"><span><b>Ruach is free, forever.</b> It runs on donations from people it has helped. Every gift goes toward new translations, more guided studies, and keeping the app ad-free.</span><button class="btn" id="donate" type="button">Support Ruach</button></div>
+        <div class="promise"><b>Free for everyone.</b> No paywall, no ads, no account. All <span id="trCount">47</span> translations here are public domain or free to share. Popular modern versions like the NIV and ESV belong to publishers and need a license. Your saves and journal stay on this device.</div>
+        <p class="lede" style="font-size:12px">Hebrew and Greek word data and dictionaries: STEPBible.org, Tyndale House Cambridge (CC BY 4.0). Cross references: OpenBible.info (CC BY). Bible texts: public-domain editions gathered by the Scrollmapper Bible Databases project.</p>
+      </div>
+    </section>
+  </div>
+
+  <nav class="nav" aria-label="Main">
+    <button data-v="feed" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 9h6M9 13h4"/></svg>Scroll</button>
+    <button data-v="read"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 6c-2-1.5-5-2-8-1.5v14c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5v-14c-3-.5-6 0-8 1.5zM12 6v14"/></svg>Read</button>
+    <button data-v="journeys"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 20c3-1 3-5 7-6s5-5 7-10"/><circle cx="5" cy="20" r="1.5"/><circle cx="19" cy="4" r="1.5"/></svg>Grow</button>
+    <button data-v="saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg>Saved</button>
+    <button data-v="me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>My Walk</button>
+  </nav>
+</div>
+
+<div class="backdrop" id="backdrop" hidden></div>
+<aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Go deeper" hidden><div class="grab"></div><div class="sh" id="sheetBody"></div></aside>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ================= reference data ================= */
+const BOOKS=["Genesis","Exodus","Leviticus","Numbers","Deuteronomy","Joshua","Judges","Ruth","1 Samuel","2 Samuel","1 Kings","2 Kings","1 Chronicles","2 Chronicles","Ezra","Nehemiah","Esther","Job","Psalms","Proverbs","Ecclesiastes","Song of Solomon","Isaiah","Jeremiah","Lamentations","Ezekiel","Daniel","Hosea","Joel","Amos","Obadiah","Jonah","Micah","Nahum","Habakkuk","Zephaniah","Haggai","Zechariah","Malachi","Matthew","Mark","Luke","John","Acts","Romans","1 Corinthians","2 Corinthians","Galatians","Ephesians","Philippians","Colossians","1 Thessalonians","2 Thessalonians","1 Timothy","2 Timothy","Titus","Philemon","Hebrews","James","1 Peter","2 Peter","1 John","2 John","3 John","Jude","Revelation"];
+const CHAPS=[50,40,27,36,34,24,21,4,31,24,22,25,29,36,10,13,10,42,150,31,12,8,66,52,5,48,12,14,3,9,1,4,7,3,3,3,2,14,4,28,16,24,21,28,16,16,13,6,6,4,4,5,3,6,4,3,1,13,5,5,3,5,1,1,1,22];
+const INTRO=["Beginnings: creation, the fall, and God's promise to Abraham's family.","God rescues Israel from slavery in Egypt and gives the Law at Sinai.","How a holy God lives among his people: worship, sacrifice, and holiness.","Israel's forty years in the wilderness, between promise and arrival.","Moses' farewell sermons, calling Israel to love God with all their heart.","Joshua leads Israel into the promised land.","A cycle of drifting, suffering, crying out, and rescue through unlikely leaders.","A Moabite widow's loyalty, and how God works through ordinary kindness.","Samuel, Saul, and the rise of David, the shepherd chosen to be king.","David's reign: victories, failures, and God's promise of an everlasting throne.","Solomon's wisdom and temple, then a kingdom split in two.","The decline of Israel and Judah, ending in exile.","Israel's story retold from David on, centered on worship and the temple.","The kings of Judah, from Solomon to the exile, and the call to seek God.","Exiles return to Jerusalem and rebuild the temple.","Nehemiah rebuilds Jerusalem's walls and renews the people's covenant.","A Jewish queen in Persia risks her life, and God's hidden hand saves a people.","A righteous man suffers, questions God, and meets him in the storm.","Israel's songbook: praise, lament, trust, and every emotion brought to God.","Practical wisdom for everyday life, rooted in the fear of the Lord.","The search for meaning under the sun, and why only God satisfies.","A love poem celebrating devotion between a bride and her beloved.","Judgment and comfort, and the coming Servant who carries our sorrows.","The weeping prophet warns Judah and promises a new covenant.","Five poems of grief over Jerusalem's fall, with hope at the center.","Visions of God's glory, judgment, and dry bones brought to life.","Faithfulness in a foreign empire, and visions of God's coming kingdom.","God's unfailing love for an unfaithful people, pictured in a marriage.","The day of the Lord, and a promise to pour out his Spirit on all flesh.","A shepherd prophet calls for justice to roll down like waters.","A short warning to Edom about pride.","A reluctant prophet, a great fish, and God's mercy for enemies.","Judgment and hope, and what the Lord requires: justice, mercy, humility.","The fall of Nineveh and God's justice.","A prophet wrestles with God and learns to rejoice anyway.","The day of the Lord, ending with God singing over his people.","A call to rebuild God's house and put him first.","Visions of restoration and a humble king riding on a donkey.","The last Old Testament voice, calling hearts back to God.","Jesus the promised King, his teaching, death, and resurrection.","The fast-moving story of Jesus the servant who came to give his life.","Jesus seeks and saves the lost, told with care for outsiders.","Jesus is the Word made flesh, written so that you may believe.","The Spirit comes and the church spreads from Jerusalem to Rome.","The gospel explained: God's righteousness, grace, and new life in the Spirit.","Paul corrects a divided church and describes the greatest thing, love.","Strength in weakness, comfort in suffering, and the new creation.","Freedom in Christ: saved by grace, not by keeping rules.","Who you are in Christ, and how to walk in it.","A joyful letter from prison about contentment in Christ.","Christ is supreme over all, so set your mind on things above.","Encouragement to a young church about Jesus' return.","Clarity about the day of the Lord, and a call to keep working faithfully.","Paul guides Timothy on leading a church well.","Paul's last letter: guard the faith and finish the race.","Healthy teaching and good works in Crete.","A personal plea to welcome a runaway slave back as a brother.","Jesus is better than everything that came before, so hold fast.","Faith that works, in how we speak, treat others, and endure trials.","Hope and holiness for believers who are suffering.","Grow in grace and watch for false teachers.","God is light and God is love, so walk in both.","Walk in truth and love.","Hospitality to faithful workers.","Contend for the faith.","Visions of Christ's victory and a new heaven and earth."];
+const BINFO=[["Moses (traditional)","c. 1400s–1200s BC","Genesis 50:20"],["Moses (traditional)","c. 1400s–1200s BC","Exodus 3:14"],["Moses (traditional)","c. 1400s–1200s BC","Leviticus 19:2"],["Moses (traditional)","c. 1400s–1200s BC","Numbers 6:24-26"],["Moses (traditional)","c. 1400s–1200s BC","Deuteronomy 6:5"],["Unknown; tradition credits Joshua","Events c. 1400–1200 BC","Joshua 1:9"],["Unknown; tradition credits Samuel","Events c. 1380–1050 BC","Judges 21:25"],["Unknown","Set in the days of the judges","Ruth 1:16"],["Unknown; draws on Samuel, Nathan and Gad","Events c. 1100–1010 BC","1 Samuel 16:7"],["Unknown; draws on Nathan and Gad","Events c. 1010–970 BC","2 Samuel 7:16"],["Unknown; tradition credits Jeremiah","Finished c. 560 BC","1 Kings 18:21"],["Unknown; tradition credits Jeremiah","Finished c. 560 BC","2 Kings 6:16"],["Unknown; tradition credits Ezra","c. 450–400 BC","1 Chronicles 16:34"],["Unknown; tradition credits Ezra","c. 450–400 BC","2 Chronicles 7:14"],["Ezra (traditional)","c. 450 BC","Ezra 7:10"],["Nehemiah","c. 430 BC","Nehemiah 8:10"],["Unknown","Events c. 480–470 BC","Esther 4:14"],["Unknown","Date debated","Job 19:25"],["David, Asaph, the sons of Korah, Solomon, Moses and others","c. 1400–400 BC","Psalms 23:1"],["Mainly Solomon, with Agur and Lemuel","c. 950–700 BC","Proverbs 3:5-6"],["The Preacher, traditionally Solomon","Date debated","Ecclesiastes 12:13"],["Traditionally Solomon","Date debated","Song of Solomon 8:7"],["Isaiah son of Amoz","Ministry c. 740–680 BC","Isaiah 53:5"],["Jeremiah, with his scribe Baruch","c. 627–580 BC","Jeremiah 29:11"],["Traditionally Jeremiah","Soon after 586 BC","Lamentations 3:22-23"],["Ezekiel, a priest in exile","c. 593–570 BC","Ezekiel 36:26"],["Daniel (traditional)","Set c. 605–530 BC","Daniel 3:17"],["Hosea","c. 750–715 BC","Hosea 6:6"],["Joel","Date uncertain","Joel 2:28"],["Amos, a shepherd from Tekoa","c. 760 BC","Amos 5:24"],["Obadiah","Likely after 586 BC","Obadiah 1:15"],["Unknown; the story of Jonah son of Amittai","Set c. 780 BC","Jonah 2:9"],["Micah of Moresheth","c. 735–700 BC","Micah 6:8"],["Nahum","c. 660–612 BC","Nahum 1:7"],["Habakkuk","c. 605 BC","Habakkuk 3:18"],["Zephaniah","c. 630 BC","Zephaniah 3:17"],["Haggai","520 BC","Haggai 1:5"],["Zechariah","From 520 BC","Zechariah 4:6"],["Malachi","c. 430 BC","Malachi 3:6"],["Matthew the tax collector (traditional)","c. AD 50–70","Matthew 28:19-20"],["John Mark, drawing on Peter (traditional)","c. AD 55–65","Mark 10:45"],["Luke the physician","c. AD 60–62","Luke 19:10"],["John the apostle","c. AD 85–95","John 20:31"],["Luke the physician","c. AD 62","Acts 1:8"],["Paul","c. AD 57","Romans 1:16"],["Paul","c. AD 55","1 Corinthians 13:13"],["Paul","c. AD 56","2 Corinthians 12:9"],["Paul","c. AD 48–55","Galatians 2:20"],["Paul, from prison","c. AD 60–62","Ephesians 2:8-9"],["Paul, from prison","c. AD 61","Philippians 4:13"],["Paul, from prison","c. AD 60–62","Colossians 1:17"],["Paul","c. AD 50–51","1 Thessalonians 5:16-18"],["Paul","c. AD 51","2 Thessalonians 3:3"],["Paul","c. AD 62–64","1 Timothy 4:12"],["Paul, from prison","c. AD 64–67","2 Timothy 3:16-17"],["Paul","c. AD 63","Titus 3:5"],["Paul, from prison","c. AD 60–62","Philemon 1:16"],["Unknown","Before AD 70","Hebrews 12:1-2"],["James, the brother of Jesus","c. AD 45–50","James 1:22"],["Peter","c. AD 62–64","1 Peter 5:7"],["Peter","c. AD 64–68","2 Peter 3:9"],["John the apostle","c. AD 85–95","1 John 4:19"],["John, \"the elder\"","c. AD 85–95","2 John 1:6"],["John, \"the elder\"","c. AD 85–95","3 John 1:4"],["Jude, brother of James","c. AD 65–80","Jude 1:24"],["John, in exile on Patmos","c. AD 95","Revelation 21:4"]];
+const RTL=new Set(["WLC","HEB"]);
+// guided studies (KJV text verified against the KJV data)
+const CUR=[
+{k:"Psalms 119:105",theme:"wisdom",scene:"desert",t:"Thy word is a lamp unto my feet, and a light unto my path.",plain:"God's word doesn't light up the whole road at once. It gives enough light for the next step, and that is enough.",ctx:"Psalm 119 is the longest chapter in the Bible, a 176-verse love poem about God's word, arranged as an acrostic through the 22 letters of the Hebrew alphabet.",w:["נֵר","ner","lamp","A small clay oil lamp. Its light reached only a few feet, enough to keep a traveler from stumbling on a dark path."],x:["Proverbs 6:23","John 8:12","2 Peter 1:19"],ask:"What is the one next step you already know God is asking of you?",pray:"Lord, I don't need to see the whole road. Light my next step, and give me courage to take it."},
+{k:"Isaiah 41:10",theme:"strength",scene:"mountain",t:"Fear thou not; for I am with thee: be not dismayed; for I am thy God: I will strengthen thee; yea, I will help thee; yea, I will uphold thee with the right hand of my righteousness.",plain:"You are not facing this alone. God promises three things in a row: strength, help, and a grip that will not let you fall.",ctx:"Spoken to Israel when the surrounding nations were rising and the people felt small and exposed. God answers fear with presence before he answers it with a plan.",w:["תָּמַךְ","tamak","uphold","To grasp and hold firmly, like someone taking hold of a person who is about to fall."],x:["Deuteronomy 31:6","Psalms 73:23","2 Corinthians 12:9"],ask:"What fear are you carrying today that you haven't said out loud to God?",pray:"Father, here is my fear. Hold me up with your right hand. I choose to trust your grip more than my own."},
+{k:"Matthew 11:28",theme:"peace",scene:"sea",red:1,t:"Come unto me, all ye that labour and are heavy laden, and I will give you rest.",plain:"Jesus doesn't say \"try harder.\" He says \"come.\" The rest he gives starts with being near him.",ctx:"Jesus spoke this to crowds worn down by religious rules piled on them by their teachers. He offers a different yoke, one that is easy and light.",w:["ἀναπαύω","anapauō","give rest","To refresh and relieve, the way a tired worker is let off the load and given space to recover."],x:["Isaiah 40:29","Psalms 55:22","Hebrews 4:9"],ask:"What are you carrying that was never yours to carry?",pray:"Jesus, I'm coming to you tired. Take what's too heavy for me, and teach me your kind of rest."},
+{k:"Philippians 4:6-7",theme:"peace",scene:"night",t:"Be careful for nothing; but in every thing by prayer and supplication with thanksgiving let your requests be made known unto God. And the peace of God, which passeth all understanding, shall keep your hearts and minds through Christ Jesus.",plain:"Turn every worry into a prayer, and add thanks. God's peace then stands guard over your heart and your thoughts.",ctx:"Paul wrote this from prison, not knowing whether he would live. The man telling us not to worry had every human reason to.",w:["φρουρέω","phroureō","keep","A military word: to guard with a garrison. God's peace stands watch over your heart like soldiers at a city gate."],x:["1 Peter 5:7","Isaiah 26:3","Matthew 6:25"],ask:"Name one worry. Now name one thing you're thankful for in the same situation.",pray:"God, I bring you this worry, and I thank you that you are already in it. Guard my heart and mind with your peace."},
+{k:"Lamentations 3:22-23",theme:"hope",scene:"dawn",t:"It is of the LORD's mercies that we are not consumed, because his compassions fail not. They are new every morning: great is thy faithfulness.",plain:"Yesterday's failures don't use up today's mercy. Every morning God's kindness is fresh.",ctx:"Written after Babylon destroyed Jerusalem in 586 BC. In the middle of a book of grief, the writer remembers something that ruins can't take away.",w:["חֶסֶד","chesed","mercies","Steadfast, covenant love. Loyal kindness that keeps its promise even when the other side hasn't."],x:["Psalms 30:5","Isaiah 33:2","2 Timothy 2:13"],ask:"What from yesterday do you need to leave behind this morning?",pray:"Lord, thank you that your mercy didn't run out overnight. I receive it new today."},
+{k:"Psalms 23:1",theme:"peace",scene:"field",t:"The LORD is my shepherd; I shall not want.",plain:"If God is the one leading and caring for you, you have what you truly need.",ctx:"Written by David, who spent his youth guarding sheep from lions and bears before he became king. He knew exactly what a good shepherd does.",w:["רָעָה","ra'ah","shepherd","To tend, feed, and lead to pasture. A shepherd lived with the flock day and night."],x:["John 10:11","Ezekiel 34:15","1 Peter 2:25"],ask:"Where do you feel a lack right now? What would it look like to let God lead you there?",pray:"Good Shepherd, lead me today. I trust that with you I have enough."},
+{k:"John 3:16",theme:"love",scene:"rays",red:1,t:"For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.",plain:"God's love isn't a feeling kept at a distance. He gave his Son, and the offer is open to anyone who believes.",ctx:"Jesus said this to Nicodemus, a respected religious teacher who came to him at night with questions.",w:["ἀγαπάω","agapaō","loved","Love that chooses and gives, aimed at the good of the other no matter the cost."],x:["Romans 5:8","1 John 4:9","Ephesians 2:4"],ask:"\"Whosoever\" includes you. How does that change how you see yourself today?",pray:"Father, thank you for loving the world, and for loving me. I believe in your Son."},
+{k:"Joshua 1:9",theme:"strength",scene:"mountain",hue:1,t:"Have not I commanded thee? Be strong and of a good courage; be not afraid, neither be thou dismayed: for the LORD thy God is with thee whithersoever thou goest.",plain:"Courage here isn't self-confidence. It's confidence that God goes with you everywhere you go.",ctx:"Moses had just died. Joshua was about to lead a whole nation across the Jordan into unknown territory. God tells him to be strong three times in this chapter.",w:["חָזַק","chazaq","be strong","To grow firm, to take hold tightly. The same root is used of holding fast to something."],x:["Deuteronomy 31:8","Psalms 27:1","Matthew 28:20"],ask:"Where is God asking you to step into new territory?",pray:"Lord, you go with me wherever I go. Make me strong and courageous today."},
+{k:"Romans 8:28",theme:"hope",scene:"vine",t:"And we know that all things work together for good to them that love God, to them who are the called according to his purpose.",plain:"Not every thing is good. But God weaves all things, even painful ones, into something good for those who love him.",ctx:"Paul wrote this right after talking about suffering and groaning (Romans 8:18-27). It's a promise for hard seasons, not a slogan for easy ones.",w:["συνεργέω","synergeō","work together","To work alongside, to cooperate. Our word synergy comes from it."],x:["Genesis 50:20","Jeremiah 29:11","2 Corinthians 4:17"],ask:"Is there a past pain you can now see God used for good?",pray:"God, I don't understand everything that's happened. I trust you to work it together for good."},
+{k:"Proverbs 3:5-6",theme:"wisdom",scene:"desert",hue:1,t:"Trust in the LORD with all thine heart; and lean not unto thine own understanding. In all thy ways acknowledge him, and he shall direct thy paths.",plain:"Lean your full weight on God, not on what you can figure out. Bring him into every choice, and he will make your way straight.",ctx:"Proverbs is written as a father's teaching to his son. This passage is the heart of that advice.",w:["בָּטַח","batach","trust","To feel secure, to rely on with confidence, like leaning your weight on something you know will hold."],x:["Psalms 37:5","Jeremiah 17:7","Isaiah 26:4"],ask:"Which decision are you trying to solve alone right now?",pray:"Lord, I'm leaning on you, not on my own understanding. Direct my path."},
+{k:"Isaiah 40:31",theme:"strength",scene:"mountain",hue:2,t:"But they that wait upon the LORD shall renew their strength; they shall mount up with wings as eagles; they shall run, and not be weary; and they shall walk, and not faint.",plain:"Waiting on God isn't wasted time. It's where tired people get new strength.",ctx:"Isaiah 40 opens with \"Comfort ye my people,\" words of hope for exiles who felt forgotten by God.",w:["קָוָה","qavah","wait","To wait with eager hope. The word is linked to the idea of a cord stretched tight, a waiting full of tension and trust."],x:["Psalms 27:14","Lamentations 3:25","Galatians 6:9"],ask:"What are you waiting on God for right now?",pray:"Lord, while I wait, renew my strength. Help me run and not grow weary."},
+{k:"1 John 1:9",theme:"grace",scene:"sea",hue:1,t:"If we confess our sins, he is faithful and just to forgive us our sins, and to cleanse us from all unrighteousness.",plain:"Owning what we've done opens the door. God doesn't just forgive, he cleans the stain.",ctx:"John wrote to churches about walking in the light. Hiding sin keeps us in the dark; confessing it brings us into the light.",w:["ὁμολογέω","homologeō","confess","Literally \"to say the same thing.\" Confession is agreeing with God about what's true."],x:["Psalms 32:5","Proverbs 28:13","Psalms 103:12"],ask:"Is there something you need to agree with God about today?",pray:"Father, I bring it into the light. Thank you that you are faithful to forgive and to make me clean."},
+{k:"Psalms 46:10",theme:"peace",scene:"night",hue:1,t:"Be still, and know that I am God: I will be exalted among the heathen, I will be exalted in the earth.",plain:"Stop striving for a moment. God is God, and he will be honored everywhere.",ctx:"A song of confidence while nations rage and the earth shakes. It inspired Martin Luther's hymn \"A Mighty Fortress Is Our God.\"",w:["רָפָה","raphah","be still","To let go, to relax your grip, to let your hands drop."],x:["Exodus 14:14","Isaiah 30:15","Psalms 37:7"],ask:"What are you gripping too tightly?",pray:"God, I let go. You are God and I am not. I rest in that."},
+{k:"John 8:12",theme:"hope",scene:"rays",hue:1,red:2,t:"Then spake Jesus again unto them, saying, I am the light of the world: he that followeth me shall not walk in darkness, but shall have the light of life.",plain:"Jesus doesn't just show the way. He is the light, and following him means never walking in total darkness again.",ctx:"Spoken around the Feast of Tabernacles, when huge lamps were lit in the temple courts to remember God's pillar of fire in the wilderness.",w:["φῶς","phōs","light","The word behind \"photo.\" In John's writing, light means truth, life, and God's presence."],x:["Psalms 27:1","Isaiah 9:2","Matthew 5:14"],ask:"Where do you need his light in a dark place in your life?",pray:"Jesus, light of the world, I follow you. Shine into the places I've kept dark."},
+{k:"2 Corinthians 5:17",theme:"grace",scene:"dawn",hue:1,t:"Therefore if any man be in Christ, he is a new creature: old things are passed away; behold, all things are become new.",plain:"In Christ you aren't just improved. You're made new.",ctx:"Paul wrote to a church in Corinth, a city known for its rough reputation. He reminds them that their past doesn't define them.",w:["καινός","kainos","new","New in kind and quality, not just recent. Something that has never existed before."],x:["Isaiah 43:18","Ezekiel 36:26","Galatians 2:20"],ask:"What \"old thing\" are you still treating as who you are?",pray:"Lord, thank you that in you I am new. Help me live like it today."},
+{k:"Psalms 34:18",theme:"hope",scene:"night",hue:2,t:"The LORD is nigh unto them that are of a broken heart; and saveth such as be of a contrite spirit.",plain:"When your heart is broken, God isn't far off. He comes close.",ctx:"David wrote this psalm after fleeing for his life and pretending to be insane to escape a foreign king. It comes from a low moment.",w:["שָׁבַר","shabar","broken","To shatter, like a clay pot broken into pieces."],x:["Psalms 147:3","Isaiah 61:1","Matthew 5:4"],ask:"Is there a broken place you've been hiding from God?",pray:"Lord, you are close to the brokenhearted. Be close to me now."},
+{k:"Micah 6:8",theme:"wisdom",scene:"field",hue:1,t:"He hath shewed thee, O man, what is good; and what doth the LORD require of thee, but to do justly, and to love mercy, and to walk humbly with thy God?",plain:"God isn't looking for grand offerings. He's looking for fairness, kindness, and a humble walk with him.",ctx:"Set as a courtroom scene. Israel asks what huge sacrifice would please God, and the answer is simpler and harder.",w:["צָנַע","tsana","humbly","To walk modestly and attentively, careful to stay close and in step."],x:["Deuteronomy 10:12","Hosea 6:6","Matthew 23:23"],ask:"Which of the three, justice, mercy, or humility, is God nudging you on today?",pray:"God, teach me to do justly, love mercy, and walk humbly with you."},
+{k:"Galatians 5:22-23",theme:"love",scene:"vine",hue:1,t:"But the fruit of the Spirit is love, joy, peace, longsuffering, gentleness, goodness, faith, Meekness, temperance: against such there is no law.",plain:"These aren't nine goals to achieve. They're one fruit the Spirit grows in us as we stay connected to him.",ctx:"Paul contrasts the \"works of the flesh\" with this fruit. Works are produced by effort; fruit grows from life.",w:["καρπός","karpos","fruit","Notice it's singular: one fruit with nine flavors, growing together."],x:["John 15:5","Colossians 3:12","2 Peter 1:5"],ask:"Which part of this fruit do you most want to see grow in you?",pray:"Holy Spirit, grow your fruit in me, especially where I'm weakest."},
+{k:"Matthew 6:34",theme:"peace",scene:"field",hue:2,red:1,t:"Take therefore no thought for the morrow: for the morrow shall take thought for the things of itself. Sufficient unto the day is the evil thereof.",plain:"Live today with God. Tomorrow's troubles will come with tomorrow's grace.",ctx:"Part of the Sermon on the Mount, right after Jesus points to birds and wildflowers that God feeds and clothes.",w:["μεριμνάω","merimnaō","take thought","To be anxious, pulled in different directions. The same word Paul uses in Philippians 4:6."],x:["Philippians 4:6","Lamentations 3:22","James 4:13"],ask:"What tomorrow-worry can you set down just for today?",pray:"Jesus, give me grace for today. I leave tomorrow in your hands."},
+{k:"Hebrews 11:1",theme:"hope",scene:"night",t:"Now faith is the substance of things hoped for, the evidence of things not seen.",plain:"Faith is solid ground under what we hope for. It's how we're sure of what we can't yet see.",ctx:"This opens Hebrews 11, often called the \"hall of faith,\" a list of people who trusted God before they saw the promise.",w:["ὑπόστασις","hypostasis","substance","The underlying foundation of something. In old papers it could mean a title deed, the proof that something is yours."],x:["Romans 8:24","2 Corinthians 5:7","1 Peter 1:8"],ask:"What promise are you holding before you can see it?",pray:"Lord, strengthen my faith in what you've promised, even before I see it."},
+{k:"Psalms 139:14",theme:"wonder",scene:"rays",hue:2,t:"I will praise thee; for I am fearfully and wonderfully made: marvellous are thy works; and that my soul knoweth right well.",plain:"You were made with awe and care. Praise is the right response to how God made you.",ctx:"David reflects on being fully known by God, from before birth to every thought.",w:["פָּלָה","palah","wonderfully","To be set apart, distinct. You are distinctly made."],x:["Genesis 1:27","Ephesians 2:10","Jeremiah 1:5"],ask:"What is one thing about how God made you that you can thank him for?",pray:"God, thank you for making me with care. Help me see myself the way you do."},
+{k:"Romans 12:2",theme:"wisdom",scene:"sea",hue:2,t:"And be not conformed to this world: but be ye transformed by the renewing of your mind, that ye may prove what is that good, and acceptable, and perfect, will of God.",plain:"Don't let the world press you into its mold. Let God change you from the inside, starting with how you think.",ctx:"After eleven chapters on God's grace, Paul turns to how grace changes the way we live.",w:["μεταμορφόω","metamorphoō","transformed","Change from the inside out. Our word metamorphosis, like a caterpillar becoming a butterfly."],x:["Ephesians 4:23","Colossians 3:2","2 Corinthians 3:18"],ask:"What is shaping your thinking most this week?",pray:"Lord, renew my mind. Shape me by your truth, not by this world."},
+{k:"Genesis 1:1",theme:"wonder",scene:"night",hue:1,t:"In the beginning God created the heaven and the earth.",plain:"Before anything else, there was God. Everything that exists came from him.",ctx:"The first sentence of the Bible. It doesn't argue for God; it starts with him.",w:["בָּרָא","bara'","created","In the Old Testament this verb always has God as its subject. Only God creates in this sense."],x:["John 1:1","Psalms 33:6","Hebrews 11:3"],ask:"Step outside or look out a window. What do you notice that God made?",pray:"Creator God, everything I see began with you. I worship you."},
+{k:"John 15:5",theme:"love",scene:"vine",hue:2,red:1,t:"I am the vine, ye are the branches: He that abideth in me, and I in him, the same bringeth forth much fruit: for without me ye can do nothing.",plain:"Branches don't strain to grow fruit. They stay connected. Our job is to stay close to Jesus.",ctx:"Jesus spoke this on his last night before the cross, possibly while walking past vineyards on the way to Gethsemane.",w:["μένω","menō","abide","To remain, to stay, to make your home. It appears ten times in John 15:1-10."],x:["Galatians 5:22","Colossians 2:6","Psalms 1:3"],ask:"What helps you stay connected to Jesus during the day?",pray:"Jesus, I want to abide in you. Keep me close today."},
+{k:"Zephaniah 3:17",theme:"love",scene:"dawn",hue:2,t:"The LORD thy God in the midst of thee is mighty; he will save, he will rejoice over thee with joy; he will rest in his love, he will joy over thee with singing.",plain:"God isn't just tolerating you. He delights in you, so much that he sings over you.",ctx:"Zephaniah is mostly warnings of judgment, but it ends with this song of restoration and joy.",w:["חָרַשׁ","charash","rest","To be quiet. He will be quiet in his love: a love so content it needs no words, before it bursts into song."],x:["Isaiah 62:5","Luke 15:7","Psalms 149:4"],ask:"Can you picture God rejoicing over you? What makes that hard to believe?",pray:"Lord, thank you that you delight in me. Let me rest in your love."},
+{k:"Psalms 30:5",theme:"hope",scene:"dawn",t:"For his anger endureth but a moment; in his favour is life: weeping may endure for a night, but joy cometh in the morning.",plain:"Hard nights are real, but they are not the end of the story. Morning comes.",ctx:"David's song at the dedication of the house, looking back on a time God rescued him.",w:["רִנָּה","rinnah","joy","A ringing shout of joy, the kind of cry you can't keep in."],x:["2 Corinthians 4:17","John 16:20","Isaiah 61:3"],ask:"What night are you in right now? Ask God for the morning.",pray:"God, I trust that joy comes in the morning. Hold me through the night."}
+];
+const POP={
+peace:["Psalms 4:8","Psalms 29:11","Isaiah 26:3","John 14:27","John 16:33","Romans 5:1","Colossians 3:15","2 Thessalonians 3:16","Numbers 6:24-26","Psalms 55:22","1 Peter 5:7","Psalms 94:19","Isaiah 32:17","Psalms 3:5","Matthew 6:26"],
+strength:["Philippians 4:13","Psalms 18:2","Psalms 28:7","Psalms 46:1","Isaiah 40:29","2 Corinthians 12:9","Nehemiah 8:10","Ephesians 6:10","Psalms 73:26","Habakkuk 3:19","Deuteronomy 31:6","Psalms 27:1","Exodus 15:2","2 Timothy 1:7","1 Corinthians 16:13"],
+hope:["Jeremiah 29:11","Romans 15:13","Psalms 42:11","Romans 5:3-5","Hebrews 6:19","1 Peter 1:3","Psalms 31:24","Revelation 21:4","Isaiah 43:19","Psalms 147:3","Lamentations 3:24","Micah 7:7","Romans 8:18","2 Corinthians 4:16-17","Psalms 121:1-2"],
+love:["1 Corinthians 13:4-7","1 John 4:19","1 John 4:8","Romans 5:8","Romans 8:38-39","John 13:34","John 15:13","Ephesians 3:17-19","1 Peter 4:8","Deuteronomy 6:5","Mark 12:30-31","Jeremiah 31:3","1 John 3:1","Song of Solomon 8:7","Psalms 136:1"],
+grace:["Ephesians 2:8-9","Titus 2:11","Romans 3:23-24","Romans 6:23","Hebrews 4:16","Isaiah 1:18","Psalms 103:12","Micah 7:18","John 1:16","1 Timothy 1:15","Luke 15:20","Romans 8:1","Psalms 51:10","Acts 3:19","Ephesians 1:7"],
+wisdom:["James 1:5","Proverbs 1:7","Proverbs 9:10","Psalms 90:12","Proverbs 16:3","Proverbs 4:23","Colossians 3:23","James 1:19","Proverbs 15:1","Matthew 7:12","Matthew 6:33","Proverbs 27:17","Ecclesiastes 3:1","Psalms 1:1-2","Proverbs 16:9"],
+wonder:["Psalms 19:1","Psalms 8:3-4","John 1:1","John 1:14","Colossians 1:16-17","Isaiah 55:8-9","Revelation 4:11","Psalms 104:24","Job 38:4","Romans 11:33","Isaiah 40:26","Psalms 95:4-5","Hebrews 1:3","Psalms 148:3","Genesis 1:27"],
+follow:["Matthew 28:19-20","Luke 9:23","Matthew 5:14-16","Romans 10:9","Galatians 2:20","Matthew 4:19","John 14:6","Acts 1:8","Joshua 24:15","Romans 1:16","Hebrews 12:1-2","James 2:17","1 Thessalonians 5:16-18","Matthew 22:37","Mark 16:15"]};
+const THEMES={peace:["Peace","For anxious days","table"],strength:["Strength","When you feel weak","mountain"],hope:["Hope","For the long night","dawn"],love:["Love","How God sees you","vine"],grace:["Grace","Starting over","sea"],wisdom:["Wisdom","For hard choices","desert"],wonder:["Wonder","Awe at what God made","rays"],follow:["Following Jesus","Faith in everyday life","walk"]};
+const PAUSES=[["Be still","and know that I am God"],["The Lord is my shepherd","I shall not want"],["Thy will","be done"],["Lord Jesus Christ","have mercy on me"],["Speak, Lord","your servant hears"]];
+const QUIZ=[
+{q:"Paul wrote Philippians, his letter about joy, from where?",o:["A prison cell","A ship at sea","The Temple","A market in Athens"],a:0,e:"He mentions his \"bonds\" in Philippians 1:13. Joy, written in chains."},
+{q:"How many books are in the Protestant Bible?",o:["72","66","39","54"],a:1,e:"39 in the Old Testament and 27 in the New."},
+{q:"Psalm 23 is traditionally credited to whom?",o:["Solomon","Moses","David","Asaph"],a:2,e:"Its heading reads \"A Psalm of David.\" He was a shepherd before he was a king."},
+{q:"Which book comes right after the four Gospels?",o:["Romans","Acts","Hebrews","Revelation"],a:1,e:"Acts tells how the early church spread after Jesus rose."},
+{q:"Which is the longest book in the Bible by chapters?",o:["Isaiah","Genesis","Psalms","Jeremiah"],a:2,e:"Psalms has 150 chapters, each one a song or poem."},
+{q:"Who was swallowed by a great fish?",o:["Jonah","Elijah","Peter","Noah"],a:0,e:"Jonah 1:17. He spent three days inside before being brought to dry land."}];
+const FACTS=["Psalm 119 is the longest chapter in the Bible: 176 verses, built as an acrostic on the 22 letters of the Hebrew alphabet.","The New Testament was written in Koine Greek, the everyday Greek of the marketplace, not the polished Greek of philosophers.","The King James Version was first published in 1611. It is in the public domain, which is why it can be shared freely.","The Bible was written over roughly 1,500 years by about 40 writers, in Hebrew, Aramaic, and Greek.","Psalm 117 is the shortest chapter in the Bible. It has just two verses."];
+const ASK=["What word or phrase stands out to you, and why?","What does this show you about who God is?","How could this change one thing you do today?","Who could you share this with this week?","Is there a promise here to hold onto, or a step to take?","Read it again slowly. What do you notice the second time?"];
+
+/* ================= state ================= */
+const K="lamplight.v2";
+let S={saved:[],amen:[],notes:{},days:{},boost:{},red:true,goal:10,total:0,tr:"KJV",size:1,pos:[0,1,1],mode:"for",read:[18,23]};
+try{const r=localStorage.getItem(K);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+function save(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}}
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
+const dkey=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+let META=null;const TR={};let filter=null;
+document.documentElement.style.setProperty("--scale",S.size);
+
+/* ================= refs ================= */
+function parse(s){const m=s.match(/^(.+?) (\d+):(\d+)(?:-(\d+))?$/);const b=BOOKS.indexOf(m[1]);return [b,+m[2],+m[3],+(m[4]||m[3])]}
+function refStr(k){const n=k[0]===18?"Psalm":BOOKS[k[0]];return `${n} ${k[1]}:${k[2]}${k[3]&&k[3]!==k[2]?"–"+k[3]:""}`}
+const keyOf=k=>k.slice(0,4).join(".");const fromKey=s=>s.split(".").map(Number);
+function textOf(k,id){const B=TR[id||S.tr];if(!B)return null;const ch=B[k[0]]&&B[k[0]][k[1]-1];if(!ch)return null;return ch.slice(k[2]-1,(k[3]||k[2])).filter(Boolean).join(" ")}
+CUR.forEach(c=>{c.key=parse(c.k);c.id=keyOf(c.key)});
+const curById=Object.fromEntries(CUR.map(c=>[c.id,c]));
+const POPK={};for(const t in POP)POPK[t]=POP[t].map(parse);
+
+/* ================= loading translations ================= */
+let pakoP=null;
+function needPako(){if(!pakoP)pakoP=new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js";s.onload=res;s.onerror=rej;document.head.appendChild(s)});return pakoP}
+function idb(){return new Promise((res,rej)=>{try{const r=indexedDB.open("lamplight",1);r.onupgradeneeded=()=>r.result.createObjectStore("tr");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}})}
+async function idbGet(id){const db=await idb();return new Promise((res,rej)=>{const q=db.transaction("tr").objectStore("tr").get(id);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})}
+async function idbPut(id,v){try{const db=await idb();db.transaction("tr","readwrite").objectStore("tr").put(v,id)}catch(e){}}
+const PK={},pendingP={};
+async function b64gz(path){let buf=null;try{buf=await idbGet(path)}catch(e){}
+ if(!buf){const r=await fetch(path);if(!r.ok)throw new Error("HTTP "+r.status);const b64=(await r.text()).trim();const bin=atob(b64);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);buf=arr.buffer;idbPut(path,buf)}
+ const u=new Uint8Array(buf);let txt;
+ if(u[0]===0x1f&&u[1]===0x8b){if(window.DecompressionStream){txt=await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).text()}else{await needPako();txt=pako.ungzip(u,{to:"string"})}}
+ else txt=new TextDecoder().decode(u);
+ return JSON.parse(txt)}
+function loadPack(path){if(PK[path])return Promise.resolve(PK[path]);if(pendingP[path])return pendingP[path];pendingP[path]=b64gz(path).then(d=>PK[path]=d);pendingP[path].catch(()=>{delete pendingP[path]});return pendingP[path]}
+function loadTr(id){if(TR[id])return Promise.resolve(TR[id]);return loadPack("bibles/"+id+".b64.txt").then(d=>TR[id]=d)}
+const trName=id=>(META&&META.tr.find(t=>t.id===id)||{name:id}).name;
+const trMeta=id=>(META&&META.tr.find(t=>t.id===id))||{id,name:id,lang:""};
+const trOf=k=>textOf(k)?S.tr:"KJV";
+
+/* ================= scenes ================= */
+function rng(seed){let a=0;for(const c of String(seed))a=(a*31+c.charCodeAt(0))|0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const PAL={
+ dawn:[["#2b2350","#b8607a","#f2b36a","#3a2a3f","#1d1626"],["#1f2c4f","#9d6aa0","#f7c98b","#2e2a42","#17141f"],["#33204a","#d37a6b","#f8d08a","#40283a","#1c1420"]],
+ night:[["#05070f","#121a3a","#2a2f5a","#0b0d18","#06070c"],["#0a0712","#221636","#3d2a5c","#0f0b18","#07050b"],["#030a10","#0d2433","#1f4250","#06131a","#03080b"]],
+ sea:[["#1c3f57","#5c8c99","#f0c27b","#123346","#0a1f2c"],["#202348","#6a6ea0","#f1b08a","#1a2244","#0e142a"],["#13363a","#4f8a83","#e9d29a","#0f2c2d","#081a1b"]],
+ field:[["#3b2a1f","#b8794a","#f3d08b","#6b4a22","#2b1d10"],["#2a3340","#8b8f86","#ead7a0","#56502f","#22200f"],["#40221d","#c4644a","#f5c27a","#6a3a1c","#2a140b"]],
+ mountain:[["#1c2433","#56637a","#c9b8a2","#2a3344","#141a24"],["#241e30","#6c5a7a","#e1b7a1","#30283e","#16121e"],["#16242a","#4c6f78","#e6c99a","#22353b","#0e181c"]],
+ rays:[["#120e0a","#3a2814","#f0c069","#1c140c","#0b0806"],["#0c0f16","#22304a","#bcd3f0","#121826","#080a10"],["#140b10","#3d1d2c","#f2a98a","#1d0f16","#0c060a"]],
+ vine:[["#0d1a12","#24432c","#c8d98a","#13261a","#08110b"],["#141a0d","#3b4a1f","#e3cf7d","#1f2611","#0b0f06"],["#101414","#2a3d36","#d6c48d","#18241f","#090e0c"]],
+ city:[["#070a16","#18204a","#f2c46b","#141a33","#0b0e1e"],["#0d0a18","#2a1f45","#f0b27a","#1c1630","#100c1c"],["#06121a","#123447","#e9d29a","#0e2430","#081620"]],
+ walk:[["#2b2350","#c0707a","#f5bd72","#3b2b3f","#1c1524"],["#1d2a48","#8c78a4","#f6cd92","#2c2a40","#16141f"],["#3a2219","#c96f4f","#f7c47c","#4a2a1c","#24130c"]],
+ table:[["#3a4f78","#e0a07a","#ffd9a0","#2a2230","#17121c"],["#24345c","#b58aa8","#f8d2a6","#241d2c","#120e17"],["#4a6a7a","#e7b98a","#fde3b0","#2e2620","#18130f"]],
+ desert:[["#2a1d33","#9a5d63","#f0b177","#7b4b3e","#3a231e"],["#1f2238","#7a6a8a","#efc39a","#6d5546","#2f241f"],["#2c1a1a","#b0644a","#f6c477","#8a5232","#3d2214"]]};
+let sid=0;
+function sceneSVG(kind,hue,seed){
+ const p=PAL[kind][hue||0],r=rng(seed),id="g"+(sid++);
+ let s=`<svg viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="${id}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p[0]}"/><stop offset=".55" stop-color="${p[1]}"/><stop offset=".85" stop-color="${p[2]}"/></linearGradient><radialGradient id="${id}g"><stop offset="0" stop-color="${p[2]}" stop-opacity=".9"/><stop offset="1" stop-color="${p[2]}" stop-opacity="0"/></radialGradient></defs><rect width="400" height="800" fill="url(#${id}s)"/>`;
+ const hills=(y,amp,col,n)=>{let d=`M0 ${y}`;for(let i=0;i<=n;i++){const x=i*400/n;d+=` Q${(x-200/n).toFixed(1)} ${(y-amp*r()).toFixed(1)} ${x.toFixed(1)} ${(y-amp*.3*r()).toFixed(1)}`}return `<path d="${d} L400 800 L0 800Z" fill="${col}"/>`};
+ const stars=n=>{let o="";for(let i=0;i<n;i++)o+=`<circle class="tw" style="animation-delay:${(r()*3.6).toFixed(2)}s" cx="${(r()*400).toFixed(1)}" cy="${(r()*420).toFixed(1)}" r="${(r()*1.4+.3).toFixed(2)}" fill="#fff"/>`;return o};
+ if(kind==="night"){s+=stars(80)+`<circle cx="300" cy="150" r="70" fill="url(#${id}g)" opacity=".5"/><circle cx="300" cy="150" r="22" fill="#f4ede1"/><circle cx="310" cy="144" r="20" fill="${p[0]}"/>`+hills(600,90,p[3],5)+hills(680,60,p[4],4)}
+ else if(kind==="dawn"){s+=`<circle cx="200" cy="520" r="190" fill="url(#${id}g)"/><circle cx="200" cy="520" r="46" fill="#fff3d6" opacity=".95"/>`+hills(560,70,p[3],4)+hills(640,80,p[4],3)}
+ else if(kind==="sea"){s+=`<circle cx="130" cy="430" r="160" fill="url(#${id}g)"/><circle cx="130" cy="430" r="34" fill="#fff3d6" opacity=".9"/><rect y="460" width="400" height="340" fill="${p[3]}"/>`;for(let i=0;i<9;i++){const y=470+i*38;s+=`<path class="drift" style="animation-duration:${7+i}s" d="M-40 ${y} q25 -8 50 0 t50 0 t50 0 t50 0 t50 0 t50 0 t50 0 t50 0 t50 0 t50 0" stroke="${i<3?p[2]:p[1]}" stroke-opacity="${(.5-i*.04).toFixed(2)}" fill="none" stroke-width="2"/>`}s+=`<rect y="700" width="400" height="100" fill="${p[4]}" opacity=".6"/>`}
+ else if(kind==="field"){s+=`<circle cx="280" cy="470" r="170" fill="url(#${id}g)"/><circle cx="280" cy="480" r="38" fill="#fff3d6" opacity=".9"/>`+hills(520,40,p[3],3);for(let i=0;i<90;i++){const x=r()*420-10,h=120+r()*170;s+=`<path d="M${x.toFixed(1)} 800 q${(r()*16-8).toFixed(1)} ${(-h/2).toFixed(1)} ${(r()*20-10).toFixed(1)} ${(-h).toFixed(1)}" stroke="${r()>.5?p[2]:p[4]}" stroke-opacity="${(.35+r()*.5).toFixed(2)}" stroke-width="1.6" fill="none"/>`}}
+ else if(kind==="mountain"){s+=`<circle cx="200" cy="330" r="150" fill="url(#${id}g)" opacity=".6"/>`;const peaks=(y,h,col,n)=>{let d=`M0 ${y}`;for(let i=0;i<n;i++){const x=(i+.5)*400/n;d+=` L${(x+r()*30-15).toFixed(1)} ${(y-h*(.5+r()*.6)).toFixed(1)} L${((i+1)*400/n).toFixed(1)} ${(y-r()*h*.25).toFixed(1)}`}return `<path d="${d} L400 800 L0 800Z" fill="${col}"/>`};s+=peaks(470,230,p[1],3)+`<rect y="420" width="400" height="60" fill="${p[2]}" opacity=".18"/>`+peaks(560,200,p[3],4)+peaks(660,140,p[4],5);if(String(seed).startsWith("22.40.31"))s+=`<path d="M140 250 q25 -18 50 0 q25 -18 50 0" stroke="#f4ede1" stroke-width="2.5" fill="none"/>`}
+ else if(kind==="rays"){s+=`<g class="rays">`;for(let i=0;i<9;i++){const a=-40+i*10+r()*4,w=3+r()*5;s+=`<polygon points="200,-60 ${(200+Math.tan((a-w/2)*Math.PI/180)*900).toFixed(1)},840 ${(200+Math.tan((a+w/2)*Math.PI/180)*900).toFixed(1)},840" fill="${p[2]}" opacity="${(.08+r()*.12).toFixed(2)}"/>`}s+=`</g><circle cx="200" cy="-20" r="220" fill="url(#${id}g)" opacity=".7"/>`;for(let i=0;i<40;i++)s+=`<circle class="tw" style="animation-delay:${(r()*3).toFixed(2)}s" cx="${(r()*400).toFixed(1)}" cy="${(r()*700).toFixed(1)}" r="${(r()*1.5+.4).toFixed(2)}" fill="${p[2]}"/>`;s+=hills(720,40,p[4],3)}
+ else if(kind==="vine"){s+=`<circle cx="300" cy="200" r="180" fill="url(#${id}g)" opacity=".5"/>`;for(let v=0;v<4;v++){let x=40+v*110+r()*20,y=820,d=`M${x.toFixed(1)} ${y}`;const leaves=[];for(let i=0;i<7;i++){const nx=x+(r()*80-40),ny=y-90-r()*40;d+=` Q${(x+(r()*120-60)).toFixed(1)} ${((y+ny)/2).toFixed(1)} ${nx.toFixed(1)} ${ny.toFixed(1)}`;leaves.push([nx,ny]);x=nx;y=ny}s+=`<path d="${d}" stroke="${p[3]}" stroke-width="4" fill="none" stroke-linecap="round"/>`;for(const[lx,ly]of leaves){s+=`<ellipse cx="${(lx+10).toFixed(1)}" cy="${ly.toFixed(1)}" rx="16" ry="8" transform="rotate(${(r()*80-40).toFixed(0)} ${lx.toFixed(1)} ${ly.toFixed(1)})" fill="${r()>.4?p[1]:p[3]}"/>`;if(r()>.7)for(let g=0;g<5;g++)s+=`<circle cx="${(lx-6+(g%3)*6).toFixed(1)}" cy="${(ly+10+Math.floor(g/3)*6).toFixed(1)}" r="3.6" fill="${p[2]}" opacity=".8"/>`}}}
+ else if(kind==="desert"){s+=stars(30)+`<circle cx="200" cy="470" r="200" fill="url(#${id}g)"/><circle cx="200" cy="480" r="30" fill="#fff3d6" opacity=".9"/>`+hills(520,50,p[3],3)+hills(600,60,p[4],2)+`<path d="M200 520 C 215 560, 160 600, 210 650 S 120 740, 230 800" stroke="${p[2]}" stroke-width="3" fill="none" stroke-dasharray="2 8" stroke-linecap="round" opacity=".9"/><circle cx="214" cy="736" r="34" fill="url(#${id}g)" class="flick"/><circle cx="214" cy="736" r="5" fill="#fff3d6"/>`}
+ else if(kind==="city"){s+=stars(45)+`<circle cx="90" cy="150" r="90" fill="url(#${id}g)" opacity=".4"/><circle cx="90" cy="150" r="16" fill="#f4ede1" opacity=".85"/>`;
+  let x=-10;while(x<410){const w=36+r()*46,h=150+r()*250,top=800-h;s+=`<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="${r()>.5?p[3]:p[4]}"/>`;
+   for(let wy=top+14;wy<790;wy+=20)for(let wx=x+6;wx<x+w-8;wx+=12)if(r()>.7)s+=`<rect x="${wx.toFixed(1)}" y="${wy.toFixed(1)}" width="6" height="9" fill="${p[2]}" opacity="${(.45+r()*.5).toFixed(2)}"/>`;
+   x+=w+2}
+  s+=`<path d="M296 800V540l26-34 26 34v260z" fill="${p[4]}"/><path d="M322 452v44M310 470h24" stroke="${p[2]}" stroke-width="4" stroke-linecap="round"/><rect x="313" y="560" width="18" height="26" rx="9" fill="${p[2]}" class="flick"/>`}
+ else if(kind==="walk"){s+=`<circle cx="200" cy="470" r="210" fill="url(#${id}g)"/><circle cx="200" cy="480" r="40" fill="#fff3d6" opacity=".92"/>`+hills(540,50,p[3],3)+`<path d="M110 800 C 170 700, 225 640, 196 548 L 206 548 C 250 640, 300 700, 340 800Z" fill="${p[2]}" opacity=".3"/>`+hills(650,36,p[4],2);
+  const person=(x,y,sc,c)=>`<g transform="translate(${x} ${y}) scale(${sc})"><circle cx="0" cy="-64" r="9" fill="${c}"/><path d="M-11 -52h22l4 36h-30z" fill="${c}"/><path d="M-5 -16l-3 32M5 -16l3 32" stroke="${c}" stroke-width="7" stroke-linecap="round"/><path d="M-12 -48l-5 26M12 -48l5 26" stroke="${c}" stroke-width="5" stroke-linecap="round"/></g>`;
+  s+=person(186,652,1.55,'#120e16')+person(224,648,1.3,'#120e16')}
+ else if(kind==="table"){s+=`<defs><clipPath id="${id}w"><rect x="80" y="90" width="240" height="340" rx="4"/></clipPath></defs><g clip-path="url(#${id}w)"><circle cx="200" cy="360" r="160" fill="url(#${id}g)"/><circle cx="200" cy="372" r="30" fill="#fff3d6" opacity=".95"/>`+hills(400,40,p[3],3)+`</g>
+  <path d="M0 0H400V800H0Z M80 90V430H320V90Z" fill="${p[4]}" fill-rule="evenodd"/><path d="M200 90V430M80 260H320" stroke="${p[4]}" stroke-width="8"/><rect x="66" y="430" width="268" height="14" rx="3" fill="${p[3]}"/>
+  <rect x="0" y="610" width="400" height="190" fill="${p[3]}"/><rect x="0" y="606" width="400" height="8" fill="${p[2]}" opacity=".25"/>
+  <path d="M110 660 L200 642 L200 712 L98 728Z" fill="#efe6d2"/><path d="M200 642 L290 660 L302 728 L200 712Z" fill="#e3d8c1"/><path d="M200 642V712" stroke="#b9a988" stroke-width="2"/>
+  <path d="M118 672l70-13M116 684l72-13M114 696l74-13M212 659l70 13M212 671l72 13M212 683l74 13" stroke="#a89878" stroke-width="2" opacity=".7"/><path d="M200 712 L196 742" stroke="#9e2c2c" stroke-width="3"/>
+  <rect x="300" y="610" width="46" height="54" rx="7" fill="${p[2]}"/><path d="M346 622c16 0 16 26 0 26" stroke="${p[2]}" stroke-width="6" fill="none"/>
+  <path class="flick" d="M312 600c-8-14 8-20 0-36M326 598c-8-14 8-20 0-36" stroke="#fff3d6" stroke-width="2.5" fill="none" opacity=".6" stroke-linecap="round"/>`}
+ return s+"</svg>"}
+function sceneFor(k){const b=k[0],r=rng(keyOf(k))();const g=b<5?["desert","mountain","walk"]:b<17?["field","mountain","desert","walk"]:b<22?["night","dawn","field","table"]:b<39?["mountain","rays","night","city"]:b<43?["sea","rays","field","walk"]:b===43?["sea","dawn","city"]:b<65?["vine","dawn","sea","table","city"]:["rays","night"];return [g[Math.floor(r*g.length)],Math.floor(rng(keyOf(k)+"h")()*3)]}
+const GENRE=b=>b<5?"The Law":b<17?"History":b<22?"Poetry & Wisdom":b<39?"Prophets":b<43?"Gospels":b===43?"Early Church":b<65?"Letters":"Prophecy";
+
+/* ================= icons ================= */
+const I={amen:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-7-4.5-7-11a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 6.5-7 11-7 11z"/></svg>`,
+ save:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18l-6-4-6 4z"/></svg>`,
+ listen:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>`,
+ share:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v13M7 8l5-5 5 5"/><path d="M5 14v5h14v-5"/></svg>`,
+ book:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 6c-2-1.5-5-2-8-1.5v14c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5v-14c-3-.5-6 0-8 1.5zM12 6v14"/></svg>`};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
+
+/* ================= feed ================= */
+const feed=document.getElementById("feed");
+let pI=0,qI=0,fI=0,round=0,cardN=0;
+const shuffled=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+function randomVerse(){const B=TR[S.tr];for(let n=0;n<40;n++){const b=Math.floor(Math.random()*66);if(!B[b]||!B[b].length)continue;const c=1+Math.floor(Math.random()*B[b].length),ch=B[b][c-1],v=1+Math.floor(Math.random()*ch.length),t=ch[v-1]||"";if(t.length>50&&t.length<230)return [b,c,v,v]}return [42,3,16,16]}
+function weighted(themes){const w=themes.map(t=>Math.max(1,3+(S.boost[t]||0)));const sum=w.reduce((a,b)=>a+b,0);let x=Math.random()*sum;for(let i=0;i<themes.length;i++){x-=w[i];if(x<=0)return themes[i]}return themes[0]}
+function interleave(out){const n=out.length;
+ if(n%5===4)out.push({t:"p",p:PAUSES[pI++%PAUSES.length]});
+ else if(n%7===6)out.push({t:"q",q:QUIZ[qI++%QUIZ.length]});
+ else if(n%11===10)out.push({t:"f",f:FACTS[fI++%FACTS.length]})}
+const MISSION_KJV="All scripture is given by inspiration of God, and is profitable for doctrine, for reproof, for correction, for instruction in righteousness: That the man of God may be perfect, throughly furnished unto all good works.";
+const MISSION_LINE="We exist to put all of Scripture in everyone's hands, free, so that every reader is equipped for every good work.";
+function missionText(){return textOf([54,3,16,17])||MISSION_KJV}
+function batchFor(){const out=[];const ready=!!TR[S.tr];if(round===0&&!filter){out.push({t:"r"});out.push({t:"m"})}
+ let cur=shuffled(filter?CUR.filter(c=>c.theme===filter):CUR);
+ if(round===0&&!filter){const i=cur.findIndex(c=>c.id==="18.119.105.105");if(i>0)cur.unshift(cur.splice(i,1)[0])}
+ if(!ready){cur.forEach(c=>{out.push({t:"v",k:c.key,c});interleave(out)});round++;return out}
+ const themes=filter?[filter]:Object.keys(POPK);let ci=0;
+ for(let i=0;i<14;i++){
+  if(i%4===0&&ci<cur.length){const c=cur[ci++];out.push({t:"v",k:c.key,c})}
+  else if(!filter&&i%5===2)out.push({t:"v",k:randomVerse()});
+  else{const th=weighted(themes);const arr=POPK[th];out.push({t:"v",k:arr[Math.floor(Math.random()*arr.length)],th})}
+  interleave(out)}
+ round++;return out}
+function batchThru(){const out=[];const B=TR[S.tr];if(!B)return out;let [b,c,v]=S.feedPos||S.pos;let g0=0;while(!B[b].length&&g0++<66){b=(b+1)%66;c=1;v=1}
+ for(let i=0;i<14;i++){if(v===1)out.push({t:"ch",b,c});
+  out.push({t:"v",k:[b,c,v,v],thru:1});v++;
+  if(v>(B[b][c-1]||[]).length){v=1;c++;if(c>B[b].length){c=1;b=(b+1)%66;let g2=0;while(!B[b].length&&g2++<66)b=(b+1)%66}}}
+ S.feedPos=[b,c,v];return out}
+function nextBatch(){return S.mode==="thru"?batchThru():batchFor()}
+function fontFor(t){const n=t.length,sc=S.size;const f=n<70?[30,8.4,42]:n<140?[26,7,34]:n<210?[23,6,29]:n<320?[20,5.2,25]:[18,4.6,22];return `clamp(${f[0]*sc}px,${(f[1]*sc).toFixed(1)}vw,${f[2]*sc}px)`}
+function verseHTML(k,c){let t;
+ if(c&&S.tr==="KJV")t=c.t;else t=textOf(k)||textOf(k,"KJV")||(c?c.t:"");
+ if(c&&c.red&&S.red&&S.tr==="KJV"){if(c.red===2){const i=t.indexOf("I am");return esc(t.slice(0,i))+`<span class="red">${esc(t.slice(i))}</span>`}return `<span class="red">${esc(t)}</span>`}
+ return esc(t)}
+function plainText(k,c){return (c&&S.tr==="KJV")?c.t:(textOf(k)||textOf(k,"KJV")||(c?c.t:""))}
+function render(items){
+ for(const it of items){
+  const el=document.createElement("article");el.className="card";const key="c"+(cardN++);
+  if(it.t==="v"){const k=it.k,c=it.c||curById[keyOf(k)];const id=keyOf(k);el.dataset.k=id;
+   const [sc,hue]=c?[c.scene,c.hue||0]:sceneFor(k);const txt=plainText(k,c);
+   const tag=c?THEMES[c.theme][0]+" · Guided study":it.th?THEMES[it.th][0]:it.thru?BOOKS[k[0]]+" "+k[1]:GENRE(k[0]);
+   el.innerHTML=`<div class="scene">${sceneSVG(sc,hue,id+key)}</div><div class="shade"></div>
+   <div class="body"><div class="tag"><i></i>${esc(tag)}</div>
+   <p class="verse" ${RTL.has(trOf(k))?'dir="rtl"':""} style="font-size:${fontFor(txt)}">${verseHTML(k,c)}</p>
+   <div class="ref">${refStr(k)} · ${esc(trOf(k))}</div>
+   <button class="deeper ${c?"study":""}" data-a="deeper">${I.book}${c?"Open study":"Go deeper"}</button></div>
+   <div class="rail">
+    <button class="act ${S.amen.includes(id)?"on":""}" data-a="amen" aria-label="Amen"><span class="ic">${I.amen}</span>Amen</button>
+    <button class="act ${S.saved.includes(id)?"on":""}" data-a="save" aria-label="Save"><span class="ic">${I.save}</span>Save</button>
+    <button class="act" data-a="listen" aria-label="Listen"><span class="ic">${I.listen}</span>Listen</button>
+    <button class="act" data-a="share" aria-label="Copy verse"><span class="ic">${I.share}</span>Share</button></div>`;
+   if(it.thru)el.dataset.pos=JSON.stringify([k[0],k[1],k[2]]);
+   let last=0;el.addEventListener("click",e=>{if(e.target.closest("button"))return;const n=Date.now();if(n-last<320)amen(el,true);last=n});
+  }else if(it.t==="ch"){const [sc,hue]=sceneFor([it.b,it.c,1]);
+   el.innerHTML=`<div class="scene">${sceneSVG(sc,hue,"ch"+it.b+it.c+key)}</div><div class="shade" style="background:rgba(10,8,14,.55)"></div>
+   <div class="center"><div class="eyebrow">${GENRE(it.b)}</div><p class="bigbook">${esc(BOOKS[it.b])}</p><div class="bigch">CHAPTER ${it.c} OF ${CHAPS[it.b]}</div>${it.c===1?`<p class="hint">${esc(INTRO[it.b])}</p>`:""}<p class="hint" style="font-size:13px">Swipe up to read verse by verse</p></div>`;
+  }else if(it.t==="r"){
+   el.innerHTML=`<div class="scene">${sceneSVG("sea",1,"ruach")}</div><div class="shade" style="background:rgba(10,8,14,.5)"></div>
+   <div class="center"><div class="eyebrow">Welcome</div><p class="bigbook">Ruach</p><div class="bigch" lang="he">ROO-AKH · רוּחַ</div><p class="fact" style="font-style:italic">Breath. Wind. Spirit.</p><p class="hint">Ruach is Hebrew for the breath God breathed into Adam (Genesis 2:7) and the wind that raised the dry bones to life (Ezekiel 37). Scripture is God-breathed. This app is here to help you breathe it in.</p><p class="hint" style="color:var(--gold);font-weight:600">God-breathed. Every word.</p><p class="hint" style="font-size:13px">Swipe up</p></div>`;
+  }else if(it.t==="m"){el.dataset.t="m";
+   el.innerHTML=`<div class="scene">${sceneSVG("rays",0,"mission")}</div><div class="shade" style="background:rgba(10,8,14,.5)"></div>
+   <div class="center"><div class="eyebrow">Our mission</div><p class="fact" style="max-width:24ch">${esc(missionText())}</p><div class="ref">2 Timothy 3:16–17 · ${esc(TR[S.tr]?S.tr:"KJV")}</div><p class="hint">${esc(MISSION_LINE)}</p><p class="hint" style="font-size:13px">Swipe up to begin</p></div>`;
+  }else if(it.t==="p"){
+   el.innerHTML=`<div class="scene">${sceneSVG("night",cardN%3,"pause"+key)}</div><div class="shade" style="background:rgba(10,8,14,.45)"></div>
+   <div class="center"><div class="eyebrow">Pause · Breath prayer</div><div class="orb"><span>${it.p[0]}</span><span>${it.p[1]}</span></div><p class="hint">Breathe in as the light grows. Breathe out as it fades. Stay as long as you like.</p></div>`;
+  }else if(it.t==="q"){const q=it.q;
+   el.innerHTML=`<div class="scene">${sceneSVG("rays",1,"quiz"+key)}</div><div class="shade" style="background:rgba(10,8,14,.55)"></div>
+   <div class="center"><div class="eyebrow">Quick check</div><p class="q">${esc(q.q)}</p><div class="opts">${q.o.map((o,i)=>`<button class="opt" data-i="${i}">${esc(o)}</button>`).join("")}</div><p class="explain" aria-live="polite"></p></div>`;
+   el.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{if(el.dataset.done)return;el.dataset.done=1;const i=+b.dataset.i;el.querySelectorAll(".opt")[q.a].classList.add("right");if(i!==q.a)b.classList.add("wrong");el.querySelector(".explain").textContent=(i===q.a?"Right. ":"Not quite. ")+q.e});
+  }else{
+   el.innerHTML=`<div class="scene">${sceneSVG("desert",2,"fact"+key)}</div><div class="shade" style="background:rgba(10,8,14,.55)"></div>
+   <div class="center"><div class="eyebrow">Did you know</div><p class="fact">${esc(it.f)}</p></div>`}
+  feed.appendChild(el);io.observe(el)}}
+const seen=new WeakSet();
+const io=new IntersectionObserver(es=>{for(const e of es){if(!e.isIntersecting)continue;const c=e.target;
+ const kids=feed.children;if(c===kids[kids.length-1]||c===kids[kids.length-3])render(nextBatch());
+ if(c.dataset.k&&!seen.has(c)){seen.add(c);countRead()}
+ if(c.dataset.pos){const p=JSON.parse(c.dataset.pos);S.pos=p;S.read=[p[0],p[1]];save()}}},{root:feed,threshold:.6});
+function resetFeed(){round=0;cardN=0;feed.innerHTML="";S.feedPos=null;render(nextBatch());feed.scrollTop=0;injectDevoCard()}
+
+function countRead(){const d=today();S.days[d]=(S.days[d]||0)+1;S.total++;save();updateGoal();
+ const n=S.days[d];if(n===S.goal)toast(`Daily goal reached: ${n} verses. Well done.`);else if(n===5)toast("5 verses in. Keep going.")}
+function streak(){let n=0;const t=new Date();for(;;){const d=new Date(t);d.setDate(t.getDate()-n);if(S.days[dkey(d)])n++;else break}return n}
+function updateGoal(){const n=S.days[today()]||0,g=S.goal;document.getElementById("goalN").textContent=`${Math.min(n,g)}/${g}`;
+ document.getElementById("ringArc").setAttribute("stroke-dashoffset",(88*(1-Math.min(n/g,1))).toFixed(1));
+ document.getElementById("streakN").textContent=Math.max(streak(),1)}
+
+feed.addEventListener("click",e=>{const b=e.target.closest("button[data-a]");if(!b)return;const el=b.closest(".card");const k=fromKey(el.dataset.k),c=curById[el.dataset.k];const a=b.dataset.a;
+ if(a==="amen")amen(el,false);
+ else if(a==="save"){toggleSave(el.dataset.k);b.classList.toggle("on",S.saved.includes(el.dataset.k))}
+ else if(a==="listen")speak(plainText(k,c)+". "+refStr(k));
+ else if(a==="share")copy(`"${plainText(k,c)}" ${refStr(k)} (${S.tr})`);
+ else if(a==="deeper")openSheet(k)});
+function toggle(arr,id){const i=arr.indexOf(id);i<0?arr.push(id):arr.splice(i,1)}
+function toggleSave(id){toggle(S.saved,id);save();toast(S.saved.includes(id)?"Saved":"Removed from saved")}
+function themeOf(id){const c=curById[id];if(c)return c.theme;for(const t in POPK)if(POPK[t].some(k=>keyOf(k)===id))return t;return null}
+function amen(el,dbl){const id=el.dataset.k,btn=el.querySelector('[data-a="amen"]');const was=S.amen.includes(id);
+ if(dbl&&was){burst(el);return}toggle(S.amen,id);const on=!was;btn.classList.toggle("on",on);
+ const th=themeOf(id);if(th)S.boost[th]=(S.boost[th]||0)+(on?1:-1);save();if(on)burst(el)}
+function burst(el){const b=document.createElement("div");b.className="burst";b.textContent="Amen";el.appendChild(b);setTimeout(()=>b.remove(),900)}
+function speak(t){try{const ss=window.speechSynthesis;if(!ss){toast("Read-aloud isn't available in this browser");return}
+ if(ss.speaking){ss.cancel();return}const u=new SpeechSynthesisUtterance(t.replace("–"," to "));u.rate=.88;const lang={RV1909:"es",CRAMPON:"fr",ELB:"de",BLIVRE:"pt",SYNOD:"ru",CUV:"zh",VIET:"vi",TAG:"fil",KOR:"ko",JPN:"ja",HAT:"ht",UKR:"uk",SWE:"sv",NOR:"nb",NLD:"nl",POL:"pl",CZE:"cs",HUN:"hu",FIN:"fi",ELL:"el",HEB:"he",THA:"th",MAL:"ml",LAT:"la",SQI:"sq",HRV:"hr",DAN:"da",MRI:"mi",EPO:"eo",WLC:"he",GNT:"el"}[S.tr];if(lang)u.lang=lang;ss.speak(u)}catch(e){toast("Read-aloud isn't available in this browser")}}
+function copy(t){const ok=()=>toast("Copied. Paste it anywhere to share.");try{navigator.clipboard.writeText(t).then(ok,()=>toast("Copy is blocked here. Long-press the text to select it."))}catch(e){toast("Copy is blocked here. Long-press the text to select it.")}}
+let tt;function toast(m){const el=document.getElementById("toast");el.textContent=m;el.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>el.classList.remove("show"),2400)}
+
+/* ================= study sheet ================= */
+const sheet=document.getElementById("sheet"),bd=document.getElementById("backdrop");
+const CMP=["KJV","BSB","NHEB","YLT","BBE","ASV","RV1909"];
+function openSheet(k){const id=keyOf(k),c=curById[id];const B=TR[S.tr];
+ let ctxH="";if(B){const ch=B[k[0]][k[1]-1],a=Math.max(1,k[2]-3),z=Math.min(ch.length,(k[3]||k[2])+3);for(let v=a;v<=z;v++){const t=esc(ch[v-1]||"");ctxH+=(v>=k[2]&&v<=(k[3]||k[2]))?`<sup>${v}</sup><b>${t}</b> `:`<sup>${v}</sup>${t} `}}
+ const ask=c?c.ask:ASK[(k[0]+k[1]+k[2])%ASK.length];
+ let h=`<div class="sec"><div class="tag"><i></i>${refStr(k)} · ${esc(trName(S.tr))}</div><p class="verse">${verseHTML(k,c)}</p></div>`;
+ if(c)h+=`<div class="sec"><h3>In plain words</h3><p>${esc(c.plain)}</p></div><div class="sec"><h3>The setting</h3><p>${esc(c.ctx)}</p></div>
+  <div class="sec"><h3>Word study</h3><div class="word"><div class="orig" lang="${/[֐-׿]/.test(c.w[0])?"he":"el"}">${c.w[0]}</div><div class="wm"><div class="tr">${esc(c.w[1])} · “${esc(c.w[2])}”</div><div class="wn">${esc(c.w[3])}</div></div></div></div>`;
+ const bi=BINFO[k[0]];h+=`<div class="sec"><h3>About ${esc(BOOKS[k[0]])}</h3><p>${esc(INTRO[k[0]])}</p><div class="facts"><div><small>Written by</small><span>${esc(bi[0])}</span></div><div><small>When</small><span>${esc(bi[1])}</span></div><div><small>Section</small><span>${GENRE(k[0])}</span></div></div><p class="kv" id="kv"></p></div>`;
+ if(ctxH)h+=`<div class="sec"><h3>In context</h3><p class="ctx">${ctxH}</p></div>`;
+ h+=`<div class="sec"><h3>Compare translations</h3><div class="pills" id="cmpPills">${[...CMP,k[0]<39?"WLC":"GNT"].filter(t=>t!==S.tr).map(t=>`<button class="pill" data-t="${t}" aria-pressed="false">${t}</button>`).join("")}</div><div class="cmp" id="cmpOut"></div></div>`;
+ if(c)h+=`<div class="sec"><h3>Read it alongside</h3><div class="pills">${c.x.map(r=>`<button class="pill" data-x="${r}">${r.replace("Psalms","Psalm")}</button>`).join("")}</div><div class="cmp" id="xOut"></div></div>`;
+ h+=`<div class="sec"><h3>Original ${k[0]<39?"Hebrew":"Greek"}, word by word</h3><p class="lede" style="font-size:13px">Tap a word to see what it means.</p><div class="ow" id="ow" ${k[0]<39?'dir="rtl"':""}><span class="lede">Loading…</span></div><div id="lexOut"></div></div>`;
+ h+=`<div class="sec"><h3>Cross references</h3><div id="xr" class="xrl"><span class="lede">Loading…</span></div></div>`;
+ h+=`<div class="sec"><h3>Reflect</h3><p>${esc(ask)}</p><textarea id="noteBox" placeholder="Write a thought or a prayer. It stays on this device.">${esc(S.notes[id]||"")}</textarea><div class="btns"><button class="btn" id="saveNote">Save to journal</button><button class="ghost" id="toCh">Read all of ${esc(BOOKS[k[0]])} ${k[1]}</button></div></div>`;
+ if(c)h+=`<div class="sec"><h3>Pray</h3><p class="pray">${esc(c.pray)}</p></div>`;
+ document.getElementById("sheetBody").innerHTML=h;
+ document.getElementById("saveNote").onclick=()=>{const t=document.getElementById("noteBox").value.trim();if(t)S.notes[id]=t;else delete S.notes[id];save();toast(t?"Saved to your journal":"Journal entry removed")};
+ document.getElementById("toCh").onclick=()=>{closeSheet();S.read=[k[0],k[1]];go("read");drawChapter(k[2])};
+ document.querySelectorAll("#cmpPills .pill").forEach(p=>p.onclick=async()=>{if(p.getAttribute("aria-pressed")==="true")return;p.setAttribute("aria-pressed","true");const t=p.dataset.t;const out=document.getElementById("cmpOut");const box=document.createElement("div");box.innerHTML=`<small>${esc(t)} · loading…</small><p></p>`;out.appendChild(box);
+  try{await loadTr(t);box.innerHTML=`<small>${esc(trName(t))}</small><p dir="auto">${esc(textOf(k,t)||"Not in this translation.")}</p>`}catch(e){box.innerHTML=`<small>${esc(t)}</small><p>Couldn't load this translation. Check your connection and tap again.</p>`;p.setAttribute("aria-pressed","false")}});
+ document.querySelectorAll("[data-x]").forEach(p=>p.onclick=()=>{const xk=parse(p.dataset.x);const out=document.getElementById("xOut");if(out.querySelector(`[data-xk="${keyOf(xk)}"]`))return;const t=textOf(xk);if(!t){toast("Still opening the Bible. Try again in a moment.");return}
+  const d=document.createElement("div");d.dataset.xk=keyOf(xk);d.innerHTML=`<small>${refStr(xk)}</small><p>${esc(t)}</p>`;out.appendChild(d)});
+ showSheet();fillDeep(k)}
+function showSheet(){sheet.hidden=bd.hidden=false;sheet.scrollTop=0;requestAnimationFrame(()=>{sheet.classList.add("show");bd.classList.add("show")})}
+function closeSheet(){sheet.classList.remove("show");bd.classList.remove("show");setTimeout(()=>{sheet.hidden=bd.hidden=true},300)}
+bd.onclick=closeSheet;document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet();hideVbar()}});
+let sy=null;sheet.addEventListener("touchstart",e=>{if(sheet.scrollTop<=0)sy=e.touches[0].clientY},{passive:true});
+sheet.addEventListener("touchend",e=>{if(sy!==null&&e.changedTouches[0].clientY-sy>90)closeSheet();sy=null});
+
+async function fillDeep(k){
+ const kv=parse(BINFO[k[0]][2]),kvEl=document.getElementById("kv");
+ if(kvEl){const go_=()=>{const t=textOf(kv)||textOf(kv,"KJV");if(t)kvEl.innerHTML=`<b>Key verse · ${refStr(kv)}</b>${esc(t)}`};go_();if(!kvEl.innerHTML)loadTr("KJV").then(go_).catch(()=>{})}
+ const ow=document.getElementById("ow");
+ try{const O=await loadPack("orig/"+k[0]+".b64.txt");if(!ow.isConnected)return;let words=[];for(let v=k[2];v<=(k[3]||k[2]);v++)words=words.concat(((O[k[1]-1]||[])[v-1])||[]);
+  ow.innerHTML=words.length?words.map(w=>`<button class="wd" type="button" data-s="${esc(w[3])}"><span class="o">${esc(w[0])}</span><span class="t">${esc(w[1])}</span><span class="g">${esc(w[2])}</span></button>`).join(""):`<span class="lede">No original-language words for this verse.</span>`;
+  ow.onclick=async e=>{const b=e.target.closest(".wd");if(!b)return;ow.querySelectorAll(".wd.on").forEach(x=>x.classList.remove("on"));b.classList.add("on");const sg=b.dataset.s,out=document.getElementById("lexOut");if(!sg){out.innerHTML="";return}
+   out.innerHTML=`<div class="lex"><span class="lede">Looking it up…</span></div>`;
+   try{const L=await loadPack("orig/lex"+sg[0]+".b64.txt");const en=L[sg]||L[sg.replace(/[A-Z]$/,"")];
+    out.innerHTML=en?`<div class="lex"><div class="lh"><span class="o" ${sg[0]==="H"?'dir="rtl" lang="he"':'lang="el"'}>${esc(en[0])}</span><span class="tr">${esc(en[1])} · Strong's ${esc(sg)}</span></div><b>${esc(en[2])}</b><p>${esc(en[3])}</p></div>`:`<div class="lex"><p>No dictionary entry for ${esc(sg)}.</p></div>`}
+   catch(err){out.innerHTML=`<div class="lex"><p>Couldn't load the dictionary. Check your connection and tap the word again.</p></div>`}}
+ }catch(e){if(ow.isConnected)ow.innerHTML=`<span class="lede">Couldn't load the original text. Check your connection.</span>`}
+ const xr=document.getElementById("xr");if(!xr)return;
+ try{const X=await loadPack("xref/"+k[0]+".b64.txt");if(!xr.isConnected)return;let refs=[];for(let v=k[2];v<=(k[3]||k[2]);v++)refs=refs.concat(((X[k[1]-1]||[])[v-1])||[]);
+  const seen=new Set();refs=refs.filter(r=>{const q=r.join(".");if(seen.has(q))return false;seen.add(q);return true}).slice(0,10);
+  xr.innerHTML=refs.length?refs.map(r=>{const t=textOf(r)||textOf(r,"KJV")||"";return `<button class="xri" type="button" data-jump="${keyOf(r)}"><span class="ref">${refStr(r)}</span><span class="vt">${esc(t.length>220?t.slice(0,217)+"…":t)}</span></button>`}).join(""):`<span class="lede">No cross references for this verse yet.</span>`}
+ catch(e){if(xr.isConnected)xr.innerHTML=`<span class="lede">Couldn't load cross references. Check your connection.</span>`}}
+
+/* ================= devotionals ================= */
+let devFile=[],devDb={},canWrite=false,dbRef=null,DEVOS=[];
+function devAll(){const m=new Map();devFile.forEach(d=>d&&d.id&&m.set(d.id,d));Object.values(devDb).forEach(d=>m.set(d.id,d));return [...m.values()].filter(d=>!d.deleted&&d.title).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.updated||0)-(a.updated||0))}
+function parseLoose(str){const m=String(str||"").trim().match(/^(.+?)\s+(\d+)\s*:\s*(\d+)(?:\s*[-–]\s*(\d+))?$/);if(!m)return null;
+ let n=m[1].toLowerCase().replace(/\s+/g," ").replace(/^psalm$/,"psalms").replace(/^song of songs$/,"song of solomon").replace(/^(iii|ii|i) /,(x,r)=>r.length+" ");
+ let b=BOOKS.findIndex(x=>x.toLowerCase()===n);if(b<0&&n.length>=3)b=BOOKS.findIndex(x=>x.toLowerCase().startsWith(n));if(b<0)return null;
+ const c=+m[2],a=+m[3],e=+(m[4]||m[3]);if(c<1||c>CHAPS[b]||a<1||e<a)return null;return [b,c,a,e]}
+function fmtDate(x){if(!x)return"";const d=new Date(x+"T12:00:00");return isNaN(d)?x:d.toLocaleDateString(undefined,{month:"long",day:"numeric",year:"numeric"})}
+function drawDevos(){DEVOS=devAll();const el=document.getElementById("devList");
+ if(!DEVOS.length){el.innerHTML=`<div class="empty">${canWrite?"No devotionals yet. Tap “Write a devotional” to post the first one. Everyone using Ruach will see it here and near the top of the feed.":"Devotionals from the Ruach team will show up here. Check back soon."}</div>`;return}
+ el.innerHTML=`<div class="list">${DEVOS.map(d=>{const k=parseLoose(d.ref);const [sc,h]=k?sceneFor(k):["dawn",0];const body=d.body||"";return `<button class="row" type="button" data-devo="${esc(d.id)}"><div class="sw">${sceneSVG(sc,h,"dv"+d.id)}</div><div class="txt"><div class="ref">${esc(fmtDate(d.date))}${d.ref?" · "+esc(d.ref):""}</div><div class="vt">${esc(d.title)}</div><div class="lede" style="font-size:13px">${esc(body.slice(0,110))}${body.length>110?"…":""}</div></div></button>`}).join("")}</div>`}
+document.addEventListener("click",e=>{const r=e.target.closest("[data-devo]");if(r)openDevo(r.dataset.devo)});
+function openDevo(id){const d=DEVOS.find(x=>x.id===id);if(!d)return;const k=parseLoose(d.ref);
+ let h=`<div class="sec"><div class="tag"><i></i>Devotional · ${esc(fmtDate(d.date))}</div><h2 class="h1" style="font-size:30px">${esc(d.title)}</h2>${d.by?`<p class="lede">By ${esc(d.by)}</p>`:""}</div>`;
+ if(k)h+=`<div class="sec"><h3>${esc(refStr(k))} · ${esc(trOf(k))}</h3><p class="verse" ${RTL.has(trOf(k))?'dir="rtl"':""}>${esc(textOf(k)||textOf(k,"KJV")||"")}</p></div>`;
+ h+=`<div class="sec devbody">${(d.body||"").split(/\n\s*\n/).map(p=>`<p>${esc(p.trim()).replace(/\n/g,"<br>")}</p>`).join("")}</div>`;
+ if(d.prayer)h+=`<div class="sec"><h3>Pray</h3><p class="pray">${esc(d.prayer)}</p></div>`;
+ h+=`<div class="btns">${k?`<button class="ghost" type="button" id="devStudy">Go deeper on ${esc(refStr(k))}</button>`:""}${canWrite&&dbRef?`<button class="ghost" type="button" id="devEdit">Edit</button>`:""}</div>`;
+ document.getElementById("sheetBody").innerHTML=h;
+ if(k)document.getElementById("devStudy").onclick=()=>openSheet(k);
+ if(canWrite&&dbRef)document.getElementById("devEdit").onclick=()=>openEditor(d);
+ showSheet()}
+function openEditor(d){d=d||{};
+ document.getElementById("sheetBody").innerHTML=`<div class="sec"><div class="tag"><i></i>${d.id?"Edit devotional":"New devotional"}</div><p class="lede" style="font-size:13px">Only you and your editors can post. Everyone using Ruach can read it.</p></div>
+ <form id="devForm" class="sec" style="gap:12px" novalidate>
+  <label class="field">Title<input type="search" id="dvTitle" value="${esc(d.title||"")}" enterkeyhint="next"></label>
+  <label class="field">Scripture (e.g. Psalm 23:1-3)<input type="search" id="dvRef" value="${esc(d.ref||"")}" enterkeyhint="next"></label>
+  <p class="lede" id="dvPrev" style="font-size:13px;min-height:1em"></p>
+  <label class="field">Devotional<textarea id="dvBody" style="min-height:220px" placeholder="Leave a blank line between paragraphs.">${esc(d.body||"")}</textarea></label>
+  <label class="field">Closing prayer (optional)<textarea id="dvPray" style="min-height:80px">${esc(d.prayer||"")}</textarea></label>
+  <div class="rbar"><label class="field">Written by<input type="search" id="dvBy" value="${esc(d.by||"")}"></label><label class="field">Date<input type="date" id="dvDate" value="${esc(d.date||today())}"></label></div>
+  <p class="lede" id="dvErr" style="color:var(--no)" hidden></p>
+  <div class="btns"><button class="btn" type="submit" id="dvSave">${d.id?"Save changes":"Post devotional"}</button>${d.id?`<button class="ghost" type="button" id="dvDel">Delete</button>`:""}</div>
+ </form>`;
+ const prev=()=>{const v=document.getElementById("dvRef").value.trim(),k=parseLoose(v),t=k?(textOf(k)||textOf(k,"KJV")||""):"";document.getElementById("dvPrev").textContent=!v?"":k?`${refStr(k)}: ${t.slice(0,150)}${t.length>150?"…":""}`:"Use a reference like John 3:16 or Psalm 23:1-3."};prev();
+ document.getElementById("dvRef").addEventListener("input",prev);
+ document.getElementById("devForm").addEventListener("submit",async e=>{e.preventDefault();const g=id=>document.getElementById(id).value.trim(),err=document.getElementById("dvErr");
+  const title=g("dvTitle"),ref=g("dvRef"),body=g("dvBody");
+  if(!title||!body){err.textContent="Add a title and the devotional text before posting.";err.hidden=false;return}
+  if(ref&&!parseLoose(ref)){err.textContent="That Scripture reference wasn't recognized. Try a format like John 3:16 or Psalm 23:1-3.";err.hidden=false;return}
+  err.hidden=true;const id=d.id||("d"+Date.now().toString(36));const doc={id,title,ref,body,prayer:g("dvPray"),by:g("dvBy"),date:g("dvDate")||today(),updated:Date.now()};
+  const btn=document.getElementById("dvSave");btn.disabled=true;btn.textContent="Posting…";
+  try{await dbRef.doc("devos/"+id).set(doc);devDb[id]=doc;drawDevos();injectDevoCard();closeSheet();toast(d.id?"Devotional updated.":"Devotional posted.");publishPublicCopy()}
+  catch(x){btn.disabled=false;btn.textContent="Try again";err.textContent=x&&x.code==="invalid_argument"?"Your account can't post devotionals on this page.":"Couldn't post. Check your connection and try again.";err.hidden=false}});
+ if(d.id)document.getElementById("dvDel").onclick=async ev=>{const b=ev.currentTarget;if(b.dataset.sure!=="1"){b.dataset.sure="1";b.textContent="Tap again to delete";return}
+  try{const t={id:d.id,deleted:true,updated:Date.now()};await dbRef.doc("devos/"+d.id).set(t);devDb[d.id]=t;drawDevos();injectDevoCard();closeSheet();toast("Devotional deleted.");publishPublicCopy()}catch(x){toast("Couldn't delete. Check your connection and try again.")}};
+ showSheet()}
+async function publishPublicCopy(){try{const art=await window.claude?.use?.("artifact");if(!art)return;await art.publish({"devotionals.json":JSON.stringify({items:devAll()})})}catch(e){}}
+function devoCardHTML(d){const k=parseLoose(d.ref);const [sc,h]=k?sceneFor(k):["dawn",1];const body=d.body||"";
+ return `<div class="scene">${sceneSVG(sc,h,"dc"+d.id)}</div><div class="shade" style="background:rgba(10,8,14,.55)"></div><div class="center"><div class="eyebrow">Latest devotional</div><p class="fact">${esc(d.title)}</p>${k?`<div class="ref">${esc(refStr(k))}</div>`:""}<p class="hint">${esc(body.slice(0,160))}${body.length>160?"…":""}</p><button class="deeper" type="button" data-devo="${esc(d.id)}" style="align-self:center">${I.book}Read devotional</button></div>`}
+function injectDevoCard(){const d=devAll()[0],old=feed.querySelector(".card[data-devcard]");
+ if(!d){if(old)old.remove();return}
+ const sig=d.id+":"+(d.updated||"");if(old){if(old.dataset.sig!==sig){old.innerHTML=devoCardHTML(d);old.dataset.sig=sig}return}
+ const m=feed.querySelector('.card[data-t="m"]');if(!m)return;const el=document.createElement("article");el.className="card";el.dataset.devcard="1";el.dataset.sig=sig;el.innerHTML=devoCardHTML(d);m.after(el)}
+async function initDevos(){
+ try{const r=await fetch("devotionals.json",{cache:"no-store"});if(r.ok){const j=await r.json();devFile=Array.isArray(j.items)?j.items:[]}}catch(e){}
+ drawDevos();injectDevoCard();
+ try{if(!window.claude||!window.claude.use)return;const [db,user]=await Promise.all([window.claude.use("db"),window.claude.use("user")]);
+  canWrite=user?!!(await user.canEdit()):false;dbRef=db;document.getElementById("devNew").hidden=!(canWrite&&db);drawDevos();
+  if(!db)return;let timer=setTimeout(()=>{},10000);
+  db.collection("devos").onSnapshot(snap=>{clearTimeout(timer);const n={};snap.docs.forEach(x=>{const d=x.data();if(d&&d.id)n[d.id]=d});devDb=n;drawDevos();injectDevoCard()},()=>clearTimeout(timer));
+ }catch(e){}}
+document.getElementById("devNew").onclick=()=>openEditor();
+
+/* ================= reader ================= */
+const rBook=document.getElementById("rBook"),rCh=document.getElementById("rCh"),rTr=document.getElementById("rTr"),sTr=document.getElementById("sTr");
+rBook.innerHTML=BOOKS.map((b,i)=>`<option value="${i}">${b}</option>`).join("");
+function fillCh(){rCh.innerHTML=Array.from({length:CHAPS[S.read[0]]},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join("")}
+let selV=null;
+async function drawChapter(focus){const [b,c]=S.read;rBook.value=b;fillCh();rCh.value=c;
+ const el=document.getElementById("chapter");if(!TR[S.tr]){el.innerHTML=`<p class="lede">Opening ${esc(trName(S.tr))}…</p>`;try{await loadTr(S.tr)}catch(e){el.innerHTML=`<p class="lede">Couldn't load this translation. Check your connection, then pick it again.</p>`;return}}
+ const ch=TR[S.tr][b][c-1]||[];
+ if(!ch.length){const cv=trMeta(S.tr).cov;el.innerHTML=`<h2>${esc(BOOKS[b])} ${c}<small>${esc(S.tr)}</small></h2><div class="empty">${esc(trName(S.tr))} doesn't include ${esc(BOOKS[b])}${cv?" ("+esc(cv)+")":""}.<div class="btns" style="margin-top:12px"><button class="ghost" id="useKjv" type="button">Read it in the KJV</button></div></div>`;document.getElementById("useKjv").onclick=()=>setTr("KJV");hideVbar();return}
+ el.innerHTML=`<h2>${esc(BOOKS[b])} ${c}<small>${esc(S.tr)}</small></h2>`+(c===1?`<p class="lede" style="font-family:var(--f-ui);margin-bottom:12px">${esc(INTRO[b])}</p>`:"")+`<p ${RTL.has(S.tr)?'dir="rtl"':""}>`+ch.map((t,i)=>t?`<span class="vs ${S.saved.includes(keyOf([b,c,i+1,i+1]))?"saved":""}" data-v="${i+1}"><sup>${i+1}</sup>${esc(t)}</span> `:"").join("")+`</p>`;
+ hideVbar();save();
+ if(focus){const t=el.querySelector(`[data-v="${focus}"]`);if(t){t.classList.add("sel");setTimeout(()=>{t.scrollIntoView({block:"center"});t.classList.remove("sel")},60);setTimeout(()=>t.classList.add("sel"),80);setTimeout(()=>t.classList.remove("sel"),2200)}}
+ else document.getElementById("v-read").scrollTop=0}
+rBook.onchange=()=>{S.read=[+rBook.value,1];drawChapter()};
+rCh.onchange=()=>{S.read=[S.read[0],+rCh.value];drawChapter()};
+function step(d){let [b,c]=S.read;c+=d;if(c<1){b=(b+65)%66;c=CHAPS[b]}else if(c>CHAPS[b]){b=(b+1)%66;c=1}S.read=[b,c];drawChapter()}
+document.getElementById("prevCh").onclick=()=>step(-1);document.getElementById("nextCh").onclick=()=>step(1);
+const vbar=document.getElementById("vbar");
+document.getElementById("chapter").addEventListener("click",e=>{const v=e.target.closest(".vs");if(!v)return;document.querySelectorAll(".vs.sel").forEach(x=>x.classList.remove("sel"));v.classList.add("sel");selV=+v.dataset.v;vbar.hidden=false;vbar.querySelector('[data-v="save"]').textContent=S.saved.includes(keyOf([S.read[0],S.read[1],selV,selV]))?"Unsave":"Save"});
+function hideVbar(){vbar.hidden=true;document.querySelectorAll(".vs.sel").forEach(x=>x.classList.remove("sel"));selV=null}
+vbar.onclick=e=>{const b=e.target.closest("button");if(!b||!selV)return;const k=[S.read[0],S.read[1],selV,selV],id=keyOf(k);
+ if(b.dataset.v==="save"){toggleSave(id);document.querySelector(`.vs[data-v="${selV}"]`).classList.toggle("saved",S.saved.includes(id));hideVbar()}
+ else if(b.dataset.v==="study"){openSheet(k)}
+ else if(b.dataset.v==="copy"){copy(`"${textOf(k)}" ${refStr(k)} (${S.tr})`);hideVbar()}else hideVbar()};
+let sT;document.getElementById("rSearch").addEventListener("input",e=>{clearTimeout(sT);sT=setTimeout(()=>search(e.target.value.trim()),250)});
+function search(q){const out=document.getElementById("hits");if(q.length<3){out.hidden=true;return}const B=TR[S.tr];if(!B){out.hidden=false;out.innerHTML=`<p class="lede">Still opening the Bible…</p>`;return}
+ const ql=q.toLowerCase(),res=[];let total=0;
+ for(let b=0;b<66;b++)for(let c=0;c<B[b].length;c++)for(let v=0;v<B[b][c].length;v++){const t=B[b][c][v];if(t&&t.toLowerCase().includes(ql)){total++;if(res.length<80)res.push([b,c+1,v+1,v+1])}}
+ out.hidden=false;const re=new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"gi");
+ out.innerHTML=`<p class="lede">${total.toLocaleString()} verse${total===1?"":"s"} with “${esc(q)}”${total>80?" · showing the first 80":""}</p>`+res.map(k=>`<button class="hit" data-hk="${keyOf(k)}"><span class="ref">${refStr(k)}</span><span class="vt">${esc(textOf(k)).replace(re,m=>`<mark>${m}</mark>`)}</span></button>`).join("")}
+document.getElementById("hits").addEventListener("click",e=>{const h=e.target.closest("[data-hk]");if(!h)return;const k=fromKey(h.dataset.hk);S.read=[k[0],k[1]];drawChapter(k[2])});
+
+/* ================= translation switching ================= */
+function fillTr(){const groups={};META.tr.forEach(t=>{(groups[t.lang]=groups[t.lang]||[]).push(t)});
+ const order=Object.keys(groups).sort((a,b)=>a==="English"?-1:b==="English"?1:a==="Original languages"?1:b==="Original languages"?-1:a.localeCompare(b));
+ const opts=order.map(l=>`<optgroup label="${esc(l)}">${groups[l].map(t=>`<option value="${t.id}">${esc(t.name)}${t.cov?" · "+esc(t.cov):""}</option>`).join("")}</optgroup>`).join("");
+ rTr.innerHTML=sTr.innerHTML=opts;rTr.value=sTr.value=S.tr;const tc=document.getElementById("trCount");if(tc)tc.textContent=META.tr.length}
+async function setTr(id){S.tr=id;rTr.value=sTr.value=id;save();showLoading(`Opening ${trName(id)}…`);
+ try{await loadTr(id);if(trMeta(id).cov)await loadTr("KJV").catch(()=>{})}catch(e){hideLoading();toast("Couldn't load that translation. Check your connection.");return}
+ hideLoading();feed.querySelectorAll(".card[data-k]").forEach(el=>{const k=fromKey(el.dataset.k),c=curById[el.dataset.k];const v=el.querySelector(".verse");v.innerHTML=verseHTML(k,c);v.style.fontSize=fontFor(plainText(k,c));el.querySelector(".ref").textContent=`${refStr(k)} · ${trOf(k)}`;if(RTL.has(trOf(k)))v.setAttribute("dir","rtl");else v.removeAttribute("dir")});
+ if(!document.getElementById("v-read").hidden)drawChapter();const q=document.getElementById("rSearch").value.trim();if(q)search(q);toast(`Now reading ${trName(id)}`)}
+rTr.onchange=()=>setTr(rTr.value);sTr.onchange=()=>setTr(sTr.value);
+const loadingEl=document.getElementById("loading");
+function showLoading(m){loadingEl.innerHTML=`<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path class="flick" d="M12 3c2 2.8 3 4.5 0 8-3-3.5-2-5.2 0-8z" fill="var(--gold)"/></svg>${esc(m)}`;loadingEl.hidden=false}
+function hideLoading(){loadingEl.hidden=true}
+
+/* ================= views ================= */
+const navBtns=[...document.querySelectorAll(".nav button")];
+function go(v){navBtns.forEach(b=>b.dataset.v===v?b.setAttribute("aria-current","page"):b.removeAttribute("aria-current"));
+ ["read","journeys","saved","me"].forEach(n=>document.getElementById("v-"+n).hidden=n!==v);
+ if(v==="read")drawChapter();if(v==="saved")drawSaved();if(v==="me")drawMe();if(v!=="read")hideVbar()}
+navBtns.forEach(b=>b.onclick=()=>go(b.dataset.v));
+function rowFor(id,extra=""){const k=fromKey(id),c=curById[id];const [sc,h]=c?[c.scene,c.hue||0]:sceneFor(k);return `<button class="row" data-jump="${id}"><div class="sw">${sceneSVG(sc,h,"t"+id)}</div><div class="txt"><div class="vt">${esc(plainText(k,c))}</div><div class="ref">${refStr(k)}</div>${extra}</div></button>`}
+function drawSaved(){const el=document.getElementById("savedList"),vs=S.saved.slice().reverse();
+ el.innerHTML=vs.length?`<div class="list">${vs.map(id=>rowFor(id)).join("")}</div>`:`<div class="empty">Tap Save on any verse, in the feed or while reading, and it lands here, ready for a hard day.</div>`}
+function drawMe(){document.getElementById("missionV").textContent=missionText()+" ("+(TR[S.tr]?S.tr:"KJV")+")";document.getElementById("sToday").textContent=S.days[today()]||0;document.getElementById("sStreak").textContent=Math.max(streak(),1);document.getElementById("sTotal").textContent=S.total.toLocaleString();
+ const wk=document.getElementById("week");let h="";const L="SMTWTFS";for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);h+=`<div><i class="${S.days[dkey(d)]?"lit":""}"></i>${L[d.getDay()]}</div>`}wk.innerHTML=h;
+ let done=0;for(let b=0;b<S.pos[0];b++)done+=CHAPS[b];done+=S.pos[1]-1;const pct=done/1189*100;
+ document.getElementById("thruBar").style.width=pct.toFixed(1)+"%";document.getElementById("thruTxt").textContent=`You're at ${BOOKS[S.pos[0]]} ${S.pos[1]}:${S.pos[2]}. ${done} of 1,189 chapters behind you (${pct.toFixed(1)}%). Switch the feed to Read Through to continue.`;
+ const ns=Object.keys(S.notes);
+ document.getElementById("journalList").innerHTML=ns.length?`<div class="list">${ns.map(id=>rowFor(id,`<div class="note">${esc(S.notes[id])}</div>`)).join("")}</div>`:`<div class="empty">Open "Go deeper" on any verse and answer the reflection question. Your entries collect here.</div>`;
+ document.getElementById("sSize").value=String(S.size)}
+document.addEventListener("click",e=>{const r=e.target.closest("[data-jump]");if(r)openSheet(fromKey(r.dataset.jump))});
+function drawJourneys(){document.getElementById("jgrid").innerHTML=Object.entries(THEMES).map(([k,[n,sub,sc]])=>`<button class="jtile" data-j="${k}"><div class="scene">${sceneSVG(sc,1,"j"+k)}</div><em>${POP[k].length+CUR.filter(c=>c.theme===k).length} verses</em><b>${n}</b><small>${sub}</small></button>`).join("");
+ document.querySelectorAll(".jtile").forEach(b=>b.onclick=()=>setFilter(b.dataset.j))}
+const jchip=document.getElementById("jchip");
+function setFilter(k){filter=k;if(k)setMode("for",true);jchip.hidden=!k;if(k)jchip.innerHTML=`Journey: ${THEMES[k][0]} <span aria-hidden="true">✕</span>`;resetFeed();go("feed")}
+jchip.onclick=()=>setFilter(null);
+const mFor=document.getElementById("mFor"),mThru=document.getElementById("mThru");
+function setMode(m,quiet){S.mode=m;mFor.setAttribute("aria-pressed",m==="for");mThru.setAttribute("aria-pressed",m==="thru");save();
+ if(m==="thru"){filter=null;jchip.hidden=true}if(!quiet){if(m==="thru"&&!TR[S.tr]){toast("Opening the Bible…");loadTr(S.tr).then(resetFeed)}else resetFeed();if(m==="thru")toast(`Picking up at ${BOOKS[S.pos[0]]} ${S.pos[1]}:${S.pos[2]}`)}}
+mFor.onclick=()=>setMode("for");mThru.onclick=()=>setMode("thru");
+function sw(id,get,set){const b=document.getElementById(id);b.setAttribute("aria-checked",get());b.onclick=()=>{set(!get());b.setAttribute("aria-checked",get());save();updateGoal()}}
+sw("tRed",()=>S.red,v=>{S.red=v;feed.querySelectorAll(".card[data-k]").forEach(el=>{const c=curById[el.dataset.k];if(c)el.querySelector(".verse").innerHTML=verseHTML(c.key,c)})});
+sw("tGoal",()=>S.goal===20,v=>S.goal=v?20:10);
+document.getElementById("sSize").onchange=e=>{S.size=+e.target.value;document.documentElement.style.setProperty("--scale",S.size);save();feed.querySelectorAll(".card[data-k]").forEach(el=>{const k=fromKey(el.dataset.k),c=curById[el.dataset.k];el.querySelector(".verse").style.fontSize=fontFor(plainText(k,c))})};
+
+/* Paste the Buy Me a Coffee page here, e.g. "https://buymeacoffee.com/yourname" */
+const DONATE_URL="";
+(function(){const b=document.getElementById("donate");if(DONATE_URL){const a=document.createElement("a");a.className=b.className;a.href=DONATE_URL;a.target="_blank";a.rel="noopener";a.textContent=b.textContent+" ↗";a.style.textDecoration="none";b.replaceWith(a)}else b.onclick=()=>toast("Thank you! Donations open soon.")})();
+const FBK="ruach.feedback";
+["fb1","fb2","fb3","fb4"].forEach(id=>{const el=document.getElementById(id);try{const d=JSON.parse(localStorage.getItem(FBK)||"{}");if(d[id])el.value=d[id]}catch(e){}el.addEventListener("input",()=>{try{const d=JSON.parse(localStorage.getItem(FBK)||"{}");d[id]=el.value;localStorage.setItem(FBK,JSON.stringify(d))}catch(e){}})});
+document.getElementById("fbCopy").onclick=()=>{const v=id=>document.getElementById(id).value.trim();const parts=[["Loved",v("fb1")],["Confusing or broken",v("fb2")],["Would open daily if",v("fb3")],["Device",v("fb4")]].filter(p=>p[1]);if(!parts.length){toast("Write a little first, then copy.");return}
+ const t="Ruach feedback\n\n"+parts.map(p=>p[0]+": "+p[1]).join("\n\n");const done=()=>toast("Copied. Paste it into a text or email.");
+ try{navigator.clipboard.writeText(t).then(done,()=>{const ta=document.getElementById("fb1");toast("Copy is blocked here. Select your answers and copy them by hand.");ta.focus()})}catch(e){toast("Copy is blocked here. Select your answers and copy them by hand.")}};
+/* ================= boot ================= */
+initDevos();
+drawJourneys();updateGoal();
+mFor.setAttribute("aria-pressed",S.mode==="for");mThru.setAttribute("aria-pressed",S.mode==="thru");
+if(S.mode==="for")render(nextBatch());
+fetch("bibles/meta.json").then(r=>r.json()).then(m=>{META=m;fillTr();showLoading(`Opening ${trName(S.tr)}…`);return loadTr(S.tr)})
+ .then(()=>{hideLoading();if(trMeta(S.tr).cov)loadTr("KJV").catch(()=>{});if(S.mode==="thru")resetFeed()})
+ .catch(()=>{hideLoading();toast("Couldn't open the full Bible. Guided studies still work offline.")});
+</script>
+</body>
+</html>
